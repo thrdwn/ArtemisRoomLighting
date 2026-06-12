@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Platforms>x64</Platforms>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>NU1510</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\src\Artemis.Plugins\src\Devices\Artemis.Plugins.Devices.Razer\LedMappings.cs" Link="RazerSdkLedMappings.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="plugin.json" CopyToOutputDirectory="Always" />
+    <PackageReference Include="ArtemisRGB.Plugins.BuildTask" Version="2.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="ScreenCapture.NET" Version="3.0.0" />
+    <PackageReference Include="ScreenCapture.NET.DX11" Version="3.0.0" />
+  </ItemGroup>
+</Project>

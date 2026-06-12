@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/stage/
+**/publish/
+**/Payload.zip
+outputs/*.exe
+outputs/*.zip
+outputs/GitHub/
+*.user
+*.suo
+*.db
+*.db-wal
+*.db-shm
+*.log
+.vs/
+.idea/
