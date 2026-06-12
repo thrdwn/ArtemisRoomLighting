@@ -16,6 +16,12 @@ internal sealed class InstallerForm : Form
 
     private readonly TextBox _artemisPath = new();
     private readonly TabControl _tabs = new();
+    private readonly Label _quickStatus = new();
+    private readonly Label _presetDescription = new();
+    private readonly FlowLayoutPanel _quickDevicePanel = new();
+    private readonly Button _watchPreset = new();
+    private readonly Button _gamePreset = new();
+    private readonly Button _deskPreset = new();
     private readonly TextBox _cs2Path = new();
     private readonly TextBox _pluginSearch = new();
     private readonly DataGridView _pluginGrid = new();
@@ -40,6 +46,7 @@ internal sealed class InstallerForm : Form
     private readonly BindingList<WorkshopEntry> _visiblePlugins = [];
     private readonly List<WorkshopEntry> _allPlugins = [];
     private SetupConfiguration _configuration = new();
+    private string _selectedPreset = "Watch";
 
     public InstallerForm()
     {
@@ -60,7 +67,7 @@ internal sealed class InstallerForm : Form
         };
         Label subtitle = new()
         {
-            Text = "Use Artemis' existing plugins, map the devices in your room, and choose what each one does.",
+            Text = "Pick a mode, let the assistant choose sensible roles, then start it.",
             Location = new Point(24, 52),
             Size = new Size(900, 24),
             ForeColor = Color.FromArgb(170, 178, 190)
@@ -71,9 +78,10 @@ internal sealed class InstallerForm : Form
         _tabs.Location = new Point(20, 84);
         _tabs.Size = new Size(1120, 606);
         _tabs.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        _tabs.TabPages.Add(BuildOverviewPage());
+        _tabs.TabPages.Add(BuildQuickSetupPage());
         _tabs.TabPages.Add(BuildPluginsPage());
         _tabs.TabPages.Add(BuildDevicesPage());
+        _tabs.TabPages.Add(BuildOverviewPage());
         _tabs.TabPages.Add(BuildAdvancedPage());
         Controls.Add(_tabs);
 
@@ -84,7 +92,7 @@ internal sealed class InstallerForm : Form
         _status.Text = "Loading Artemis devices and Workshop plugins...";
         Controls.Add(_status);
 
-        _apply.Text = "Apply setup";
+        _apply.Text = "Start this setup";
         _apply.Location = new Point(982, 700);
         _apply.Size = new Size(156, 42);
         _apply.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
@@ -96,9 +104,78 @@ internal sealed class InstallerForm : Form
         Load += async (_, _) => await LoadStateAsync();
     }
 
+    private TabPage BuildQuickSetupPage()
+    {
+        TabPage page = CreatePage("Home");
+
+        AddLabel(page, "1. Choose what you are doing", 24, 22, 360, 28).Font = new Font("Segoe UI Semibold", 13);
+        ConfigurePresetButton(_watchPreset, "Watch", "Movies, YouTube, anime, streams", 24, 62);
+        ConfigurePresetButton(_gamePreset, "Game", "CS2 / Valorant intensity", 250, 62);
+        ConfigurePresetButton(_deskPreset, "Desk", "Bright lamp, calmer room", 476, 62);
+        page.Controls.Add(_watchPreset);
+        page.Controls.Add(_gamePreset);
+        page.Controls.Add(_deskPreset);
+        _watchPreset.Click += (_, _) => ApplyPreset("Watch");
+        _gamePreset.Click += (_, _) => ApplyPreset("Game");
+        _deskPreset.Click += (_, _) => ApplyPreset("Desk");
+
+        _presetDescription.Location = new Point(24, 184);
+        _presetDescription.Size = new Size(665, 60);
+        _presetDescription.ForeColor = Color.FromArgb(205, 213, 224);
+        _presetDescription.Font = new Font("Segoe UI", 10.5f);
+        page.Controls.Add(_presetDescription);
+
+        AddLabel(page, "2. Devices found", 24, 266, 220, 28).Font = new Font("Segoe UI Semibold", 13);
+        _quickDevicePanel.Location = new Point(24, 304);
+        _quickDevicePanel.Size = new Size(665, 250);
+        _quickDevicePanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+        _quickDevicePanel.AutoScroll = true;
+        _quickDevicePanel.BackColor = Color.FromArgb(23, 26, 31);
+        _quickDevicePanel.Padding = new Padding(10);
+        page.Controls.Add(_quickDevicePanel);
+
+        Panel actionPanel = new()
+        {
+            Location = new Point(732, 24),
+            Size = new Size(340, 530),
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
+            BackColor = Color.FromArgb(31, 35, 42)
+        };
+        page.Controls.Add(actionPanel);
+
+        AddLabel(actionPanel, "Ready Check", 24, 24, 260, 28).Font = new Font("Segoe UI Semibold", 13);
+        _quickStatus.Location = new Point(24, 66);
+        _quickStatus.Size = new Size(290, 230);
+        _quickStatus.ForeColor = Color.FromArgb(214, 221, 232);
+        _quickStatus.Font = new Font("Segoe UI", 10.5f);
+        actionPanel.Controls.Add(_quickStatus);
+
+        Button scan = AddButton(actionPanel, "Scan again", 24, 318, 130, 38);
+        scan.Click += (_, _) => ReloadDevices();
+        Button addDevices = AddButton(actionPanel, "Add devices", 168, 318, 130, 38);
+        addDevices.Click += (_, _) => _tabs.SelectedTab = _tabs.TabPages["Add devices"];
+        Button fineTune = AddButton(actionPanel, "Fine tune", 24, 370, 130, 38);
+        fineTune.Click += (_, _) => _tabs.SelectedTab = _tabs.TabPages["Fine tune"];
+        Button openArtemis = AddButton(actionPanel, "Open Artemis", 168, 370, 130, 38);
+        openArtemis.Click += (_, _) => OpenArtemisRoute("artemis://surface-editor");
+
+        Label hint = AddLabel(
+            actionPanel,
+            "Most people should only use this page. Open the other tabs only when a device is missing or a light feels wrong.",
+            24,
+            438,
+            292,
+            70);
+        hint.ForeColor = Color.FromArgb(158, 168, 182);
+
+        HighlightPresetButtons();
+        UpdatePresetDescription();
+        return page;
+    }
+
     private TabPage BuildOverviewPage()
     {
-        TabPage page = CreatePage("Requirements");
+        TabPage page = CreatePage("Capture");
         Label intro = AddLabel(
             page,
             "This assistant does not replace Artemis device support. Install the provider made for your hardware, " +
@@ -151,7 +228,8 @@ internal sealed class InstallerForm : Form
 
     private TabPage BuildPluginsPage()
     {
-        TabPage page = CreatePage("Plugins");
+        TabPage page = CreatePage("Add devices");
+        page.Name = "Add devices";
         AddLabel(
             page,
             "The catalog comes from the official Artemis Workshop. It includes Razer and other device providers, " +
@@ -225,7 +303,8 @@ internal sealed class InstallerForm : Form
 
     private TabPage BuildDevicesPage()
     {
-        TabPage page = CreatePage("Devices and room map");
+        TabPage page = CreatePage("Fine tune");
+        page.Name = "Fine tune";
         AddLabel(
             page,
             "Drag each enabled device to its physical position. Screen sample follows that zone; Soft depth gives " +
@@ -333,7 +412,7 @@ internal sealed class InstallerForm : Form
 
     private TabPage BuildAdvancedPage()
     {
-        TabPage page = CreatePage("Advanced compatibility");
+        TabPage page = CreatePage("Expert");
         AddLabel(
             page,
             "Use the official Artemis provider whenever one exists. The bundled direct bridge is an optional fallback " +
@@ -400,12 +479,15 @@ internal sealed class InstallerForm : Form
 
         try
         {
+            bool hasSavedDevices = _configuration.Devices.Count > 0;
             foreach (DeviceAssignment device in ArtemisState.LoadDevices(_configuration))
             {
                 device.PropertyChanged += (_, _) => _roomMap.Invalidate();
                 _devices.Add(device);
             }
             _roomMap.Devices = _devices;
+            if (!hasSavedDevices)
+                ApplyPreset("Watch", updateStatus: false);
             _status.Text = _devices.Count == 0
                 ? "No Artemis devices found. Install/enable a provider, restart Artemis, then reopen this assistant."
                 : $"Detected {_devices.Count} Artemis devices. Loading the Workshop catalog...";
@@ -417,6 +499,7 @@ internal sealed class InstallerForm : Form
 
         await LoadPluginsAsync();
         _tabs.SelectedIndex = 0;
+        UpdateQuickSummary();
     }
 
     private async Task LoadPluginsAsync()
@@ -443,10 +526,12 @@ internal sealed class InstallerForm : Form
             int providers = _allPlugins.Count(plugin =>
                 plugin.Categories.Any(category => category.Contains("Device", StringComparison.OrdinalIgnoreCase)));
             _status.Text = $"Workshop ready: {_allPlugins.Count} plugins, including {providers} device providers.";
+            UpdateQuickSummary();
         }
         catch (Exception ex)
         {
             _status.Text = "Workshop is temporarily unavailable. Installed devices can still be mapped. " + ex.Message;
+            UpdateQuickSummary();
         }
     }
 
@@ -702,6 +787,7 @@ internal sealed class InstallerForm : Form
         if (property == nameof(DeviceAssignment.Placement))
             ApplyPlacementPreset(device);
         _roomMap.Invalidate();
+        UpdateQuickSummary();
     }
 
     private static void ApplyPlacementPreset(DeviceAssignment device)
@@ -756,6 +842,244 @@ internal sealed class InstallerForm : Form
         _devices.ResetBindings();
         _roomMap.Devices = _devices;
         _status.Text = $"Detected {_devices.Count} Artemis devices.";
+        ApplyPreset(_selectedPreset, updateStatus: false);
+        UpdateQuickSummary();
+    }
+
+    private void ApplyPreset(string preset, bool updateStatus = true)
+    {
+        _selectedPreset = preset;
+        foreach (DeviceAssignment device in _devices)
+        {
+            bool emulator = device.DeviceId.Contains("Emulator", StringComparison.OrdinalIgnoreCase);
+            bool rear = IsRearDevice(device);
+            bool roomLight = IsRoomLight(device);
+            bool keyboard = IsKeyboard(device);
+            bool mouseOrDock = IsMouseOrDock(device);
+            bool study = IsStudyDevice(device);
+
+            device.Enabled = !emulator;
+            device.Placement = PresetPlacement(device);
+            ApplyPlacementPreset(device);
+            device.RedScale = device.RedScale <= 0 ? 1 : device.RedScale;
+            device.GreenScale = device.GreenScale <= 0 ? 1 : device.GreenScale;
+            device.BlueScale = device.BlueScale <= 0 ? 1 : device.BlueScale;
+
+            if (preset == "Watch")
+            {
+                _blackout.Checked = true;
+                _watchFps.Value = 30;
+                _installCs2.Checked = false;
+                device.WatchRole = rear ? "Soft depth" : "Screen sample";
+                device.GameRole = "Off";
+                device.Intensity = rear ? 45 : roomLight ? 90 : 85;
+            }
+            else if (preset == "Game")
+            {
+                _blackout.Checked = true;
+                _watchFps.Value = 30;
+                _installCs2.Checked = Directory.Exists(_cs2Path.Text);
+                device.WatchRole = "Off";
+                device.GameRole = rear ? "Impact alerts" : (keyboard || mouseOrDock || study || roomLight ? "Full game" : "Team ambient");
+                device.Intensity = rear ? 65 : study ? 100 : 90;
+            }
+            else
+            {
+                _blackout.Checked = false;
+                _watchFps.Value = 20;
+                _installCs2.Checked = false;
+                device.Enabled = study || keyboard || mouseOrDock;
+                device.WatchRole = study ? "Screen sample" : keyboard || mouseOrDock ? "Base glow" : "Off";
+                device.GameRole = "Off";
+                device.Intensity = study ? 120 : 35;
+            }
+        }
+
+        HighlightPresetButtons();
+        UpdatePresetDescription();
+        _deviceGrid.Refresh();
+        _roomMap.Invalidate();
+        UpdateQuickSummary();
+        if (updateStatus)
+            _status.Text = $"{preset} preset selected. Press Start this setup when it looks right.";
+    }
+
+    private void UpdatePresetDescription()
+    {
+        _presetDescription.Text = _selectedPreset switch
+        {
+            "Game" => "Game mode keeps keyboard, mouse, dock, and selected lights on game events. Rear lights become impact lights so they add punch without becoming the main focus.",
+            "Desk" => "Desk mode keeps the study lamp bright and leaves the rest calm. It is meant for comfort, not spectacle.",
+            _ => "Watch mode makes the screen feel bigger. Front devices follow the screen closely; rear lights stay softer so the room feels immersive without shouting."
+        };
+    }
+
+    private void UpdateQuickSummary()
+    {
+        if (!IsHandleCreated)
+            return;
+
+        int enabledDevices = _devices.Count(device => device.Enabled);
+        int providers = _allPlugins.Count(plugin => plugin.Categories.Any(category => category.Contains("Device", StringComparison.OrdinalIgnoreCase)));
+        bool hasAmbilight = _allPlugins.Any(plugin => plugin.Installed && plugin.Name.Contains("Ambilight", StringComparison.OrdinalIgnoreCase));
+        bool hasCs2 = _allPlugins.Any(plugin => plugin.Installed && plugin.Name.Contains("Counter", StringComparison.OrdinalIgnoreCase));
+
+        _quickStatus.Text =
+            $"Preset: {_selectedPreset}\n" +
+            $"Devices active: {enabledDevices}\n" +
+            $"Device providers: {(providers == 0 ? "loading" : providers)}\n" +
+            $"Ambilight: {(hasAmbilight ? "ready" : "needs import")}\n" +
+            $"CS2 profile: {(hasCs2 ? "ready" : "optional")}\n\n" +
+            "Press Start this setup to apply the selected preset.";
+
+        _quickDevicePanel.SuspendLayout();
+        _quickDevicePanel.Controls.Clear();
+        foreach (DeviceAssignment device in _devices.Take(20))
+            _quickDevicePanel.Controls.Add(CreateDeviceCard(device));
+        if (_devices.Count == 0)
+            _quickDevicePanel.Controls.Add(CreateEmptyCard("No devices found yet", "Open Artemis, install a device provider, then press Scan again."));
+        _quickDevicePanel.ResumeLayout();
+    }
+
+    private Control CreateDeviceCard(DeviceAssignment device)
+    {
+        Panel panel = new()
+        {
+            Width = 300,
+            Height = 86,
+            Margin = new Padding(6),
+            BackColor = device.Enabled ? Color.FromArgb(34, 40, 48) : Color.FromArgb(29, 31, 36)
+        };
+        Label name = AddLabel(panel, device.FriendlyName, 12, 10, 260, 22);
+        name.Font = new Font("Segoe UI Semibold", 9.5f);
+        Label role = AddLabel(panel, device.Enabled
+                ? $"{device.WatchRole} / {device.GameRole}  {device.Intensity}%"
+                : "Off",
+            12,
+            36,
+            260,
+            20);
+        role.ForeColor = device.Enabled ? Color.FromArgb(160, 204, 255) : Color.FromArgb(150, 156, 166);
+        Label provider = AddLabel(panel, device.ProviderName, 12, 58, 260, 18);
+        provider.ForeColor = Color.FromArgb(145, 154, 168);
+        return panel;
+    }
+
+    private static Control CreateEmptyCard(string title, string body)
+    {
+        Panel panel = new()
+        {
+            Width = 610,
+            Height = 86,
+            Margin = new Padding(6),
+            BackColor = Color.FromArgb(34, 40, 48)
+        };
+        Label titleLabel = new()
+        {
+            Text = title,
+            Location = new Point(12, 12),
+            Size = new Size(560, 22),
+            ForeColor = Color.FromArgb(236, 240, 246),
+            Font = new Font("Segoe UI Semibold", 10)
+        };
+        Label bodyLabel = new()
+        {
+            Text = body,
+            Location = new Point(12, 40),
+            Size = new Size(560, 30),
+            ForeColor = Color.FromArgb(166, 176, 190)
+        };
+        panel.Controls.Add(titleLabel);
+        panel.Controls.Add(bodyLabel);
+        return panel;
+    }
+
+    private static bool IsRearDevice(DeviceAssignment device)
+    {
+        string text = DeviceText(device);
+        return text.Contains("upper", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("lower", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("rear", StringComparison.OrdinalIgnoreCase) ||
+               device.Placement.Contains("Rear", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsRoomLight(DeviceAssignment device)
+    {
+        string text = DeviceText(device);
+        return text.Contains("light", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("lamp", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("hue", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("wiz", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("wled", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("nanoleaf", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsKeyboard(DeviceAssignment device)
+    {
+        return DeviceText(device).Contains("keyboard", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMouseOrDock(DeviceAssignment device)
+    {
+        string text = DeviceText(device);
+        return text.Contains("mouse", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("dock", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsStudyDevice(DeviceAssignment device)
+    {
+        string text = DeviceText(device);
+        return text.Contains("study", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("desk lamp", StringComparison.OrdinalIgnoreCase) ||
+               device.Placement.Equals("Screen top", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string PresetPlacement(DeviceAssignment device)
+    {
+        string text = DeviceText(device);
+        if (text.Contains("study", StringComparison.OrdinalIgnoreCase))
+            return "Screen top";
+        if (text.Contains("upper", StringComparison.OrdinalIgnoreCase))
+            return "Rear right";
+        if (text.Contains("lower", StringComparison.OrdinalIgnoreCase))
+            return "Rear right";
+        if (text.Contains("keyboard", StringComparison.OrdinalIgnoreCase))
+            return "Desk";
+        if (text.Contains("mouse", StringComparison.OrdinalIgnoreCase) || text.Contains("dock", StringComparison.OrdinalIgnoreCase))
+            return "Desk";
+        return device.Placement;
+    }
+
+    private static string DeviceText(DeviceAssignment device)
+    {
+        return $"{device.FriendlyName} {device.DeviceId} {device.ProviderName}";
+    }
+
+    private void ConfigurePresetButton(Button button, string title, string subtitle, int x, int y)
+    {
+        button.Text = $"{title}\n{subtitle}";
+        button.Location = new Point(x, y);
+        button.Size = new Size(200, 96);
+        button.FlatStyle = FlatStyle.Flat;
+        button.FlatAppearance.BorderSize = 1;
+        button.TextAlign = ContentAlignment.MiddleCenter;
+        button.Font = new Font("Segoe UI Semibold", 10.5f);
+        button.ForeColor = Color.White;
+    }
+
+    private void HighlightPresetButtons()
+    {
+        foreach ((Button Button, string Preset) in new[]
+                 {
+                     (_watchPreset, "Watch"),
+                     (_gamePreset, "Game"),
+                     (_deskPreset, "Desk")
+                 })
+        {
+            bool active = Preset == _selectedPreset;
+            Button.BackColor = active ? Color.FromArgb(69, 116, 187) : Color.FromArgb(42, 47, 55);
+            Button.FlatAppearance.BorderColor = active ? Color.FromArgb(170, 205, 255) : Color.FromArgb(76, 85, 98);
+        }
     }
 
     private void OpenArtemisRoute(string route)
@@ -775,7 +1099,7 @@ internal sealed class InstallerForm : Form
             Invoke(() => ToggleUi(enabled));
             return;
         }
-        _apply.Enabled = enabled;
+        _apply.Enabled = enabled && !Program.PreviewMode;
     }
 
     private void SetStatus(string text)
