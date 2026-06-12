@@ -23,7 +23,7 @@ $installerProject = Join-Path $PSScriptRoot "RoomLighting.Installer.csproj"
 $stage = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "stage"))
 $publish = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "publish"))
 $payload = Join-Path $PSScriptRoot "Payload.zip"
-$output = Join-Path $workspace "outputs\ArtemisRoomLightingSetup-0.12.0.0.exe"
+$output = Join-Path $workspace "outputs\ArtemisRoomLightingSetup-0.12.1.0.exe"
 
 function Reset-BuildDirectory {
     param([string]$Path)
