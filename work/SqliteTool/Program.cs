@@ -80,6 +80,12 @@ if (args[0] == "profile-layers")
     return;
 }
 
+if (args[0] == "configure-ecosystem" && args.Length == 2)
+{
+    ConfigureEcosystem(connection, args[1]);
+    return;
+}
+
 if (args[0] == "enable-direct")
 {
     using SqliteTransaction tx = connection.BeginTransaction();
@@ -89,6 +95,14 @@ if (args[0] == "enable-direct")
 
     tx.Commit();
     PrintPlugins(connection, filtered: true);
+    return;
+}
+
+if (args[0] == "disable-direct")
+{
+    using SqliteTransaction tx = connection.BeginTransaction();
+    SetPluginEnabled(connection, tx, directPluginGuid, isEnabled: false);
+    tx.Commit();
     return;
 }
 
@@ -1407,4 +1421,440 @@ static JsonObject CreateProperty(string identifier, string value)
         },
         ["KeyframeEntities"] = new JsonArray()
     };
+}
+
+static void ConfigureEcosystem(SqliteConnection connection, string configurationPath)
+{
+    if (!File.Exists(configurationPath))
+        throw new FileNotFoundException("The setup configuration was not found.", configurationPath);
+
+    JsonObject configuration = JsonNode.Parse(File.ReadAllText(configurationPath))?.AsObject()
+        ?? throw new InvalidOperationException("The setup configuration is invalid.");
+    JsonArray assignments = configuration["devices"]?.AsArray() ?? new JsonArray();
+
+    using SqliteTransaction transaction = connection.BeginTransaction();
+    string categoryId = EnsureProfileCategory(connection, transaction, "Applications", 3);
+    Dictionary<string, JsonArray> ledsByDevice = CollectKnownLeds(connection, transaction);
+
+    bool watchConfigured = ConfigureGuidedWatch(
+        connection,
+        transaction,
+        categoryId,
+        configuration,
+        assignments,
+        ledsByDevice);
+    bool gameConfigured = ConfigureGameProfile(
+        connection,
+        transaction,
+        assignments,
+        ledsByDevice);
+
+    transaction.Commit();
+    Console.WriteLine(watchConfigured
+        ? "Guided Watch profile configured."
+        : "Watch profile skipped: import an Ambilight profile first.");
+    Console.WriteLine(gameConfigured
+        ? "Counter-Strike 2 profile configured."
+        : "CS2 profile skipped: import the Counter-Strike 2 profile first.");
+}
+
+static Dictionary<string, JsonArray> CollectKnownLeds(SqliteConnection connection, SqliteTransaction transaction)
+{
+    Dictionary<string, JsonArray> result = new(StringComparer.OrdinalIgnoreCase);
+    Dictionary<string, HashSet<string>> keys = new(StringComparer.OrdinalIgnoreCase);
+    using SqliteCommand command = connection.CreateCommand();
+    command.Transaction = transaction;
+    command.CommandText = "select Profile from ProfileContainers";
+    using SqliteDataReader reader = command.ExecuteReader();
+    while (reader.Read())
+    {
+        JsonNode? profile = JsonNode.Parse(reader.GetString(0));
+        foreach (JsonNode? layer in profile?["Layers"]?.AsArray() ?? new JsonArray())
+        {
+            foreach (JsonNode? led in layer?["Leds"]?.AsArray() ?? new JsonArray())
+            {
+                string deviceId = led?["DeviceIdentifier"]?.GetValue<string>() ?? "";
+                string ledName = led?["LedName"]?.GetValue<string>() ?? "";
+                if (string.IsNullOrWhiteSpace(deviceId) || string.IsNullOrWhiteSpace(ledName) || led == null)
+                    continue;
+
+                if (!result.TryGetValue(deviceId, out JsonArray? deviceLeds))
+                {
+                    deviceLeds = new JsonArray();
+                    result[deviceId] = deviceLeds;
+                    keys[deviceId] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                }
+
+                string key = ledName + "|" + (led["PhysicalLayout"]?.ToJsonString() ?? "null");
+                if (keys[deviceId].Add(key))
+                    deviceLeds.Add(led.DeepClone());
+            }
+        }
+    }
+    return result;
+}
+
+static bool ConfigureGuidedWatch(
+    SqliteConnection connection,
+    SqliteTransaction transaction,
+    string categoryId,
+    JsonObject setup,
+    JsonArray assignments,
+    IReadOnlyDictionary<string, JsonArray> ledsByDevice)
+{
+    (byte[] Icon, JsonObject Configuration, JsonObject Profile)? source =
+        FindAmbilightTemplate(connection, transaction);
+    if (source == null)
+        return false;
+
+    JsonObject profileConfiguration = source.Value.Configuration.DeepClone().AsObject();
+    JsonObject profile = source.Value.Profile.DeepClone().AsObject();
+    JsonNode? templateLayer = profile["Layers"]?.AsArray()
+        .FirstOrDefault(layer => IsAmbilightLayer(layer));
+    if (templateLayer == null)
+        return false;
+
+    string profileId = Guid.NewGuid().ToString();
+    string rootFolderId = Guid.NewGuid().ToString();
+    profile["Id"] = profileId;
+    profile["Name"] = "Guided Watch";
+    profile["IsFreshImport"] = false;
+
+    JsonNode rootFolder = (profile["Folders"]?.AsArray().FirstOrDefault()?.DeepClone() ??
+                           new JsonObject
+                           {
+                               ["Order"] = 1,
+                               ["Name"] = "Root folder",
+                               ["IsExpanded"] = true,
+                               ["Suspended"] = false,
+                               ["LayerEffects"] = new JsonArray(),
+                               ["DisplayCondition"] = new JsonObject { ["$type"] = "AlwaysOn" },
+                               ["Timeline"] = new JsonObject
+                               {
+                                   ["StartSegmentLength"] = "00:00:00",
+                                   ["MainSegmentLength"] = "00:00:05",
+                                   ["EndSegmentLength"] = "00:00:00"
+                               }
+                           });
+    rootFolder["Id"] = rootFolderId;
+    rootFolder["ParentId"] = profileId;
+    profile["Folders"] = new JsonArray(rootFolder);
+
+    int width = setup["displayWidth"]?.GetValue<int>() ?? 1920;
+    int height = setup["displayHeight"]?.GetValue<int>() ?? 1080;
+    int fps = Math.Clamp(setup["watchFps"]?.GetValue<int>() ?? 30, 1, 60);
+    string display = setup["displayName"]?.GetValue<string>() ?? @"\\.\DISPLAY1";
+    bool blackoutOnBlack = setup["blackoutOnBlack"]?.GetValue<bool>() ?? true;
+    JsonArray layers = new();
+    int order = 1;
+    foreach (JsonNode? assignment in assignments)
+    {
+        if (assignment == null || !(assignment["enabled"]?.GetValue<bool>() ?? false))
+            continue;
+        string role = assignment["watchRole"]?.GetValue<string>() ?? "Off";
+        string deviceId = assignment["deviceId"]?.GetValue<string>() ?? "";
+        JsonArray deviceLeds = ResolveDeviceLeds(ledsByDevice, deviceId);
+        if (role.Equals("Off", StringComparison.OrdinalIgnoreCase) || deviceLeds.Count == 0)
+            continue;
+
+        JsonNode layer = templateLayer.DeepClone();
+        string friendlyName = assignment["friendlyName"]?.GetValue<string>() ?? deviceId;
+        int intensity = Math.Clamp(assignment["intensity"]?.GetValue<int>() ?? 100, 0, 150);
+        double roleScale = role switch
+        {
+            "Soft depth" => 0.42,
+            "Base glow" => 0.24,
+            _ => 1.0
+        };
+        if (!blackoutOnBlack && !role.Equals("Base glow", StringComparison.OrdinalIgnoreCase))
+        {
+            JsonNode floorLayer = templateLayer.DeepClone();
+            floorLayer["Id"] = Guid.NewGuid().ToString();
+            floorLayer["ParentId"] = rootFolderId;
+            floorLayer["Name"] = $"{friendlyName} - black floor";
+            floorLayer["Order"] = order++;
+            floorLayer["Suspended"] = false;
+            floorLayer["Leds"] = deviceLeds.DeepClone();
+            SetLayerOpacity(
+                floorLayer,
+                Math.Clamp((int)Math.Round(intensity * (role.Equals("Soft depth", StringComparison.OrdinalIgnoreCase) ? 0.07 : 0.12)), 0, 100)
+                    .ToString(CultureInfo.InvariantCulture));
+            SetSolidBrush(floorLayer, "#ff20242c");
+            layers.Add(floorLayer);
+        }
+        layer["Id"] = Guid.NewGuid().ToString();
+        layer["ParentId"] = rootFolderId;
+        layer["Name"] = $"{friendlyName} - {role}";
+        layer["Order"] = order++;
+        layer["Suspended"] = false;
+        layer["Leds"] = deviceLeds.DeepClone();
+        SetLayerOpacity(layer, Math.Clamp((int)Math.Round(intensity * roleScale), 0, 100).ToString(CultureInfo.InvariantCulture));
+        UpdateGuidedAmbilightCapture(layer, display, width, height, fps);
+        if (role.Equals("Base glow", StringComparison.OrdinalIgnoreCase))
+            SetSolidBrush(layer, "#ff282d38");
+        layers.Add(layer);
+    }
+    profile["Layers"] = layers;
+
+    profileConfiguration["Name"] = "Guided Watch";
+    profileConfiguration["ProfileId"] = profileId;
+    profileConfiguration["ProfileCategoryId"] = categoryId.ToLowerInvariant();
+    profileConfiguration["Order"] = 0;
+    profileConfiguration["IsSuspended"] = false;
+    UpsertProfile(
+        connection,
+        transaction,
+        "Guided Watch",
+        categoryId,
+        source.Value.Icon,
+        profileConfiguration,
+        profile);
+    return true;
+}
+
+static (byte[] Icon, JsonObject Configuration, JsonObject Profile)? FindAmbilightTemplate(
+    SqliteConnection connection,
+    SqliteTransaction transaction)
+{
+    using SqliteCommand command = connection.CreateCommand();
+    command.Transaction = transaction;
+    command.CommandText = """
+        select Icon, ProfileConfiguration, Profile
+        from ProfileContainers
+        order by
+          case json_extract(ProfileConfiguration, '$.Name')
+            when 'Ambilight' then 0
+            when 'Ambilight Smoothed - Profile v2' then 1
+            when 'Room Ambilight' then 2
+            else 3
+          end
+        """;
+    using SqliteDataReader reader = command.ExecuteReader();
+    while (reader.Read())
+    {
+        JsonObject profile = JsonNode.Parse(reader.GetString(2))!.AsObject();
+        if (!(profile["Layers"]?.AsArray().Any(IsAmbilightLayer) ?? false))
+            continue;
+        byte[] icon = reader.IsDBNull(0) ? [] : (byte[])reader[0];
+        JsonObject configuration = JsonNode.Parse(reader.GetString(1))!.AsObject();
+        return (icon, configuration, profile);
+    }
+    return null;
+}
+
+static bool ConfigureGameProfile(
+    SqliteConnection connection,
+    SqliteTransaction transaction,
+    JsonArray assignments,
+    IReadOnlyDictionary<string, JsonArray> ledsByDevice)
+{
+    using SqliteCommand select = connection.CreateCommand();
+    select.Transaction = transaction;
+    select.CommandText = """
+        select Id, ProfileConfiguration, Profile
+        from ProfileContainers
+        where json_extract(ProfileConfiguration, '$.Name') = 'Counter-Strike 2'
+        limit 1
+        """;
+    using SqliteDataReader reader = select.ExecuteReader();
+    if (!reader.Read())
+        return false;
+    string containerId = reader.GetString(0);
+    JsonObject profileConfiguration = JsonNode.Parse(reader.GetString(1))!.AsObject();
+    JsonObject profile = JsonNode.Parse(reader.GetString(2))!.AsObject();
+    reader.Close();
+
+    foreach (JsonNode? layer in profile["Layers"]?.AsArray() ?? new JsonArray())
+    {
+        if (layer == null)
+            continue;
+        string layerName = layer["Name"]?.GetValue<string>() ?? "";
+        JsonArray leds = new();
+        int maximumIntensity = 0;
+        foreach (JsonNode? assignment in assignments)
+        {
+            if (assignment == null || !(assignment["enabled"]?.GetValue<bool>() ?? false))
+                continue;
+            string role = assignment["gameRole"]?.GetValue<string>() ?? "Off";
+            if (!GameRoleIncludesLayer(role, layerName))
+                continue;
+            string deviceId = assignment["deviceId"]?.GetValue<string>() ?? "";
+            JsonArray deviceLeds = ResolveDeviceLeds(ledsByDevice, deviceId);
+            if (deviceLeds.Count == 0)
+                continue;
+            foreach (JsonNode? led in deviceLeds)
+                leds.Add(led?.DeepClone());
+            maximumIntensity = Math.Max(maximumIntensity, assignment["intensity"]?.GetValue<int>() ?? 100);
+        }
+        layer["Leds"] = leds;
+        SetLayerOpacity(layer, Math.Clamp(maximumIntensity, 0, 100).ToString(CultureInfo.InvariantCulture));
+    }
+
+    profileConfiguration["IsSuspended"] = false;
+    using SqliteCommand update = connection.CreateCommand();
+    update.Transaction = transaction;
+    update.CommandText = """
+        update ProfileContainers
+        set ProfileConfiguration = $configuration, Profile = $profile
+        where Id = $id
+        """;
+    update.Parameters.AddWithValue("$configuration", profileConfiguration.ToJsonString());
+    update.Parameters.AddWithValue("$profile", profile.ToJsonString());
+    update.Parameters.AddWithValue("$id", containerId);
+    update.ExecuteNonQuery();
+    return true;
+}
+
+static bool GameRoleIncludesLayer(string role, string layerName)
+{
+    if (role.Equals("Full game", StringComparison.OrdinalIgnoreCase))
+        return true;
+    if (role.Equals("Team ambient", StringComparison.OrdinalIgnoreCase))
+        return layerName is "Menu" or "CT" or "T";
+    if (role.Equals("Impact alerts", StringComparison.OrdinalIgnoreCase))
+        return layerName is "Damage" or "Death" or "Kill";
+    return false;
+}
+
+static JsonArray ResolveDeviceLeds(IReadOnlyDictionary<string, JsonArray> ledsByDevice, string deviceId)
+{
+    if (ledsByDevice.TryGetValue(deviceId, out JsonArray? exact))
+        return RetargetLeds(exact, deviceId);
+
+    string deviceType = deviceId.Split('-').LastOrDefault() ?? "";
+    HashSet<string> targetTokens = DeviceTokens(deviceId);
+    string? bestKey = null;
+    double bestScore = 0;
+    foreach (string candidate in ledsByDevice.Keys)
+    {
+        string candidateType = candidate.Split('-').LastOrDefault() ?? "";
+        HashSet<string> candidateTokens = DeviceTokens(candidate);
+        int intersection = targetTokens.Intersect(candidateTokens, StringComparer.OrdinalIgnoreCase).Count();
+        int union = targetTokens.Union(candidateTokens, StringComparer.OrdinalIgnoreCase).Count();
+        double score = union == 0 ? 0 : intersection / (double)union;
+        if (candidateType.Equals(deviceType, StringComparison.OrdinalIgnoreCase))
+            score += 0.15;
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestKey = candidate;
+        }
+    }
+
+    return bestKey != null && bestScore >= 0.45
+        ? RetargetLeds(ledsByDevice[bestKey], deviceId)
+        : new JsonArray();
+}
+
+static JsonArray RetargetLeds(JsonArray source, string deviceId)
+{
+    JsonArray result = new();
+    foreach (JsonNode? sourceLed in source)
+    {
+        if (sourceLed == null)
+            continue;
+        JsonNode led = sourceLed.DeepClone();
+        led["DeviceIdentifier"] = deviceId;
+        result.Add(led);
+    }
+    return result;
+}
+
+static HashSet<string> DeviceTokens(string deviceId)
+{
+    char[] normalized = deviceId
+        .Select(character => char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : ' ')
+        .ToArray();
+    return new HashSet<string>(
+        new string(normalized).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(token => token.Length > 1),
+        StringComparer.OrdinalIgnoreCase);
+}
+
+static void UpsertProfile(
+    SqliteConnection connection,
+    SqliteTransaction transaction,
+    string name,
+    string categoryId,
+    byte[] icon,
+    JsonObject profileConfiguration,
+    JsonObject profile)
+{
+    using SqliteCommand select = connection.CreateCommand();
+    select.Transaction = transaction;
+    select.CommandText = """
+        select Id
+        from ProfileContainers
+        where json_extract(ProfileConfiguration, '$.Name') = $name
+        limit 1
+        """;
+    select.Parameters.AddWithValue("$name", name);
+    object? existing = select.ExecuteScalar();
+    if (existing != null)
+    {
+        using SqliteCommand update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = """
+            update ProfileContainers
+            set Icon = $icon,
+                ProfileCategoryId = $category,
+                ProfileConfiguration = $configuration,
+                Profile = $profile
+            where Id = $id
+            """;
+        update.Parameters.AddWithValue("$icon", icon);
+        update.Parameters.AddWithValue("$category", categoryId);
+        update.Parameters.AddWithValue("$configuration", profileConfiguration.ToJsonString());
+        update.Parameters.AddWithValue("$profile", profile.ToJsonString());
+        update.Parameters.AddWithValue("$id", Convert.ToString(existing)!);
+        update.ExecuteNonQuery();
+        return;
+    }
+
+    using SqliteCommand insert = connection.CreateCommand();
+    insert.Transaction = transaction;
+    insert.CommandText = """
+        insert into ProfileContainers (Id, Icon, ProfileCategoryId, ProfileConfiguration, Profile)
+        values ($id, $icon, $category, $configuration, $profile)
+        """;
+    insert.Parameters.AddWithValue("$id", Guid.NewGuid().ToString().ToUpperInvariant());
+    insert.Parameters.AddWithValue("$icon", icon);
+    insert.Parameters.AddWithValue("$category", categoryId);
+    insert.Parameters.AddWithValue("$configuration", profileConfiguration.ToJsonString());
+    insert.Parameters.AddWithValue("$profile", profile.ToJsonString());
+    insert.ExecuteNonQuery();
+}
+
+static void UpdateGuidedAmbilightCapture(JsonNode layer, string display, int width, int height, int fps)
+{
+    JsonArray? propertyGroups = layer["LayerBrush"]?["PropertyGroup"]?["PropertyGroups"]?.AsArray();
+    if (propertyGroups == null)
+        return;
+
+    foreach (JsonNode? group in propertyGroups)
+    {
+        if (!string.Equals(group?["Identifier"]?.GetValue<string>(), "Capture", StringComparison.OrdinalIgnoreCase))
+            continue;
+        foreach (JsonNode? property in group?["Properties"]?.AsArray() ?? new JsonArray())
+        {
+            if (property == null)
+                continue;
+            string identifier = property["Identifier"]?.GetValue<string>() ?? "";
+            property["Value"] = identifier switch
+            {
+                "DisplayName" => JsonSerializer.Serialize(display),
+                "X" => "0",
+                "Y" => "0",
+                "Width" => width.ToString(CultureInfo.InvariantCulture),
+                "Height" => height.ToString(CultureInfo.InvariantCulture),
+                "CaptureFullScreen" => "true",
+                "TargetCaptureFps" => fps.ToString(CultureInfo.InvariantCulture),
+                "FrameSkip" => "0",
+                "Saturation" => "100",
+                "Contrast" => "100",
+                "Exposure" => "100",
+                _ => property["Value"]?.GetValue<string>() ?? ""
+            };
+        }
+    }
 }

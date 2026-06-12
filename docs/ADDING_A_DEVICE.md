@@ -1,42 +1,32 @@
-# Adding a Device
+# Adding Device Support
 
-## HID devices
+## Preferred path
 
-1. Add a `DirectDeviceDefinition` containing the LEDs and one or more `HidTarget` signatures.
-2. Add a small update queue or sender that owns the HID handle and reconnects after transient failures.
-3. Register the definition in `DirectDevicesProvider`.
-4. Add optional game/ambient rendering only after basic solid-color control works.
-5. Keep absent hardware non-fatal.
+Do not add another driver here when Artemis already has a provider for the device family.
 
-Useful target fields:
+1. Install the matching provider from the Artemis Workshop.
+2. Confirm the device appears in Artemis device settings.
+3. Restart the Setup Assistant.
+4. Refresh detected devices.
+5. Map the device and assign Watch and game roles.
 
-- USB vendor ID and product ID
-- HID interface number
-- usage page and usage
-- feature report length
+No assistant code change is required.
 
-Do not use serial numbers or a single machine's complete device path.
+## Missing provider
 
-## Network lights
+When Artemis does not support the hardware, contribute a provider to the official [Artemis.Plugins repository](https://github.com/Artemis-RGB/Artemis.Plugins) when practical. This gives the whole Artemis ecosystem one maintained implementation.
 
-Create an adapter that accepts a color, brightness, and off state. Keep discovery/configuration separate from frame rendering. Network errors must not stop other devices from updating.
+Useful contribution evidence includes:
 
-## UI and installer
+- hardware model and public product page
+- USB vendor/product IDs or documented network protocol
+- vendor SDK and runtime requirements
+- solid-color and per-LED tests
+- disconnect and reconnect behavior
+- tested Windows and Artemis versions
 
-If a device family needs user configuration:
+## Compatibility bridge
 
-1. Add neutral plugin defaults.
-2. Add a `SqliteTool` command for the setting.
-3. Add an optional installer field or checkbox.
-4. Add the device to Lighting Control only when users need ongoing mode-specific selection.
+Add code to `Artemis.Plugins.DirectDevices` only when an official provider is not practical or when experimental direct control is the purpose of the change.
 
-## Pull-request evidence
-
-Include:
-
-- hardware model
-- protocol or public reference
-- tested operating system and Artemis version
-- solid-color test
-- disconnect/reconnect test
-- game or ambient test when applicable
+Keep device protocol code separate from ambient and game policy. Missing hardware and network failures must remain non-fatal.

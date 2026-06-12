@@ -1,38 +1,62 @@
-# Artemis Room Lighting
+# Artemis Setup Assistant
 
-Direct ambient and game-reactive lighting for Artemis RGB without using OpenRGB as a bridge.
+A guided setup layer for Artemis RGB. It helps people discover existing Artemis plugins, understand their prerequisites, map devices to their physical room positions, and choose what each device should do in Watch and game profiles.
 
-The project combines screen capture, WiZ room lights, selected Razer HID devices, a Lenovo Legion 4-zone keyboard, and event-driven CS2/Valorant lighting. A self-contained Windows installer configures the plugin, CS2 game-state integration, and Start menu controls.
+The assistant uses the official Artemis Workshop ecosystem instead of maintaining another copy of every hardware driver. Razer, Corsair, Logitech, SteelSeries, ASUS, Hue, Nanoleaf, WLED, Windows Dynamic Lighting, OpenRGB, and future providers all use the same mapping flow once Artemis detects their devices.
 
-## Supported hardware
+## What it solves
 
-- Up to three optional WiZ RGB lights assigned as study, upper/rear, and lower/rear positions
-- Razer BlackWidow V3
-- Razer DeathAdder V2 Pro Wireless
-- Razer Mouse Dock Chroma
-- Lenovo Legion 5 2021 4-zone keyboard controllers using HID IDs `048D:C965` or `048D:C963`
+- Search the live official Workshop catalog from one screen
+- See which plugins are installed and enabled
+- Open any plugin directly in Artemis
+- Detect devices registered by any Artemis provider
+- Drag devices onto a room and screen map
+- Assign Watch roles: Screen sample, Soft depth, Base glow, or Off
+- Assign game roles: Full game, Team ambient, Impact alerts, or Off
+- Set per-device intensity and RGB calibration
+- Build a generic `Guided Watch` profile from an imported Ambilight profile
+- Fill the official Counter-Strike 2 profile with the selected devices
+- Back up the Artemis database before every apply
+- Keep the older direct WiZ bridge as an optional compatibility fallback
 
-Unsupported hardware is simply skipped. See [Adding a device](docs/ADDING_A_DEVICE.md) to contribute another adapter.
+## Requirements
+
+1. Windows 10 or Windows 11 x64.
+2. Artemis `1.2025.1222.3` or newer.
+3. Open Artemis once before running the assistant.
+4. Internet access to browse the Workshop.
+5. Install the vendor software or SDK required by your chosen provider.
+6. Import an Ambilight profile before generating `Guided Watch`.
+7. Import the official Counter-Strike 2 profile before assigning CS2 roles.
+
+See [requirements and provider notes](docs/REQUIREMENTS.md) for vendor-specific details.
+See the [setup and role guide](docs/SETUP_GUIDE.md) for mapping examples.
 
 ## Install
 
-1. Install Artemis and open it once.
-2. Download `ArtemisRoomLightingSetup-0.11.0.0.exe` from the latest GitHub release.
-3. Run the installer and approve the Windows administrator prompt.
-4. Enter only the WiZ IP addresses and device families available on that PC.
-5. Choose **Install**.
+1. Download `ArtemisRoomLightingSetup-0.12.0.0.exe` from the latest release.
+2. Run it and approve the administrator prompt.
+3. Use **Plugins** to install or enable the providers for your hardware.
+4. Restart Artemis so the devices appear.
+5. Use **Devices and room map** to place each device and assign its roles.
+6. Choose **Apply setup**.
+7. Make any final outline adjustments in the Artemis Surface Editor that opens afterward.
 
-The installer backs up the existing Artemis database and prior plugin before making changes. Updates preserve existing lighting settings by default.
+The installer does not require a GitHub login, API key, or personal credentials.
 
-## Features
+## Existing Artemis plugins
 
-- Study and cinematic Watch modes
-- Position-aware screen zones and black-screen behavior
-- Automatic CS2 and Valorant activation
-- CS2 health, armor, ammo, utility, flash, smoke, fire, damage, death, clutch, bomb, defuse, detonation, round win, and MVP effects
-- Configurable rear-light roles and event intensity
-- Start menu controls for mode switching
-- Portable, self-contained installer
+The assistant intentionally does not bundle official Workshop plugins. Artemis remains their installer and update manager. The catalog includes device providers, game integrations, layer brushes, effects, modules, and profiles.
+
+Open a catalog entry with **Open selected in Artemis**, install it there, and return to the assistant. Unsupported or absent hardware is never treated as a fatal error.
+
+OpenRGB remains optional. Users who prefer native Razer or another native Artemis provider do not need OpenRGB as a bridge.
+
+## Optional direct bridge
+
+The bundled compatibility plugin can directly control configured WiZ LAN bulbs. Its Razer and Lenovo adapters are disabled by default in the generalized setup to avoid conflicts with official providers.
+
+Use the bridge only when a native Workshop provider does not support the hardware reliably. Never control one physical device through two providers at the same time.
 
 ## Build
 
@@ -46,14 +70,8 @@ Requirements:
 powershell -ExecutionPolicy Bypass -File .\work\RoomLighting.Installer\Build-Installer.ps1
 ```
 
-The installer is written to `outputs\ArtemisRoomLightingSetup-0.11.0.0.exe`.
-
-## Publishing
-
-The repository contains no passwords, API keys, personal access tokens, personal paths, or private LAN addresses. GitHub Actions builds the installer and the release workflow uses the repository-scoped `GITHUB_TOKEN` supplied by GitHub.
-
-Creating the GitHub repository still requires a GitHub account with permission to create a repository. An organization is recommended so ownership is shared rather than tied to one person's account. Users can download releases from a public repository without signing in.
+The installer is written to `outputs\ArtemisRoomLightingSetup-0.12.0.0.exe`.
 
 ## License
 
-This project is distributed under the PolyForm Noncommercial License 1.0.0 because it incorporates mapping code from Artemis.Plugins under that license. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+This project is distributed under the PolyForm Noncommercial License 1.0.0 because the optional compatibility bridge incorporates mapping code from Artemis.Plugins under that license. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -1,25 +1,26 @@
 # Contributing
 
-Contributions are welcome for additional devices, lighting effects, setup detection, documentation, and tests.
+Contributions are welcome for setup detection, Workshop guidance, physical mapping, profile roles, accessibility, documentation, tests, and compatibility fixes.
 
 ## Development
 
 1. Fork the repository.
 2. Create a focused branch.
-3. Build the installer with `work\RoomLighting.Installer\Build-Installer.ps1`.
-4. Run `work\DirectDevicesLogicTest` and the installer payload verification.
-5. Open a pull request describing the hardware and test evidence.
+3. Build with `work\RoomLighting.Installer\Build-Installer.ps1`.
+4. Run `work\DirectDevicesLogicTest`.
+5. Verify the embedded installer payload.
+6. Test database changes against a copied Artemis database first.
+7. Open a pull request describing the behavior and test evidence.
 
 Do not commit:
 
 - Artemis databases or logs
-- private IP addresses
-- device serial numbers
-- account credentials or tokens
-- `bin`, `obj`, installer staging folders, or generated EXEs
+- private IP addresses or device serial numbers
+- account credentials, cookies, or tokens
+- `bin`, `obj`, staging folders, or generated installers
 
-## Device contributions
+## Device support
 
-Include the vendor/product IDs, interface and report details, a link to public protocol documentation when available, and graceful behavior when the device is absent. Keep device-specific protocol code isolated from game and ambient-lighting policy.
+Prefer an existing official Artemis provider. If the provider is missing, consider contributing it to the official Artemis plugin repository before adding another direct adapter here.
 
-See [docs/ADDING_A_DEVICE.md](docs/ADDING_A_DEVICE.md).
+See [Adding device support](docs/ADDING_A_DEVICE.md).

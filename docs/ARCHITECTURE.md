@@ -1,31 +1,41 @@
 # Architecture
 
-## Plugin
+## Setup assistant
 
-`Artemis.Plugins.DirectDevices` registers supported devices with Artemis and starts three independent lighting paths:
+`RoomLighting.Installer` is the main product. It reads Artemis' Workshop manifests and database to provide four guided areas:
 
-- `DirectAmbientController`: DX11 screen capture and position-aware Watch/Study rendering
-- `DirectCsController`: CS2 Game State Integration listener on loopback port `9697`
-- `DirectValorantController`: Valorant log/screen-derived events
+- requirements and Artemis deep links
+- the live official Workshop plugin catalog
+- provider-independent device mapping and roles
+- optional compatibility settings
 
-Device protocol classes are kept separate:
+Device assignments are stored in:
 
-- `WizUpdateQueue`: WiZ UDP `setPilot`
-- `WindowsHidFeatureSender`: HID feature reports
-- `RazerReports` and `RazerUpdateQueue`: Razer custom-frame reports
-- `LenovoUpdateQueue`: Lenovo 4-zone reports
+`C:\ProgramData\ArtemisRoomLighting\setup.json`
 
-## Configuration
+Assignments use the stable Artemis device identifier and provider GUID. No brand-specific model is required by the mapper.
 
-`SqliteTool` updates Artemis plugin settings while Artemis is stopped. The Lighting Control PowerShell UI calls the same tool and then restarts Artemis to apply changes.
+## Artemis integration
 
-## Installer
+The assistant leaves plugin installation and updating to Artemis. It launches official routes such as:
 
-`RoomLighting.Installer` embeds:
+- `artemis://workshop/entries/plugins/details/{entryId}`
+- `artemis://settings/devices`
+- `artemis://surface-editor`
 
-- compiled plugin
-- self-contained configuration tool
-- Lighting Control scripts
-- CS2 GSI configuration
+The assistant stops Artemis before database changes, creates a timestamped backup, updates device positions and RGB scales, configures profiles, and restarts Artemis.
 
-The installer backs up the Artemis database and previous plugin, supports optional device families, creates Start menu controls, and starts Artemis after installation.
+## Generic profiles
+
+`SqliteTool configure-ecosystem` collects known LEDs from imported Artemis profiles.
+
+- `Guided Watch` clones an installed Ambilight layer and creates one layer per selected device.
+- The official `Counter-Strike 2` profile receives LEDs according to Full game, Team ambient, or Impact alerts roles.
+
+This works across providers because profile LEDs reference Artemis device identifiers, not vendor APIs.
+
+## Optional compatibility plugin
+
+`Artemis.Plugins.DirectDevices` remains available for direct WiZ, selected HID hardware, and the richer experimental CS2/Valorant event engine developed before the generalized setup assistant.
+
+It is not the default device ecosystem. New hardware should normally be supported through an existing or contributed Artemis Workshop provider.

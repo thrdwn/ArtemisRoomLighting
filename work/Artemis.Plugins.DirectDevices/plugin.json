@@ -5,8 +5,8 @@
   "Author": "Artemis Room Lighting contributors",
   "Website": "https://artemis-rgb.com/",
   "Icon": "Lightbulb",
-  "Description": "Direct WiZ, Lenovo, and Razer control with cinematic ambient lighting plus automatic CS2 and Valorant game integrations.",
-  "Version": "0.11.0.0",
+  "Description": "Optional direct WiZ and HID compatibility bridge with experimental ambient, CS2, and Valorant integrations.",
+  "Version": "0.12.0.0",
   "Main": "Artemis.Plugins.DirectDevices.dll",
   "AutoEnableFeatures": false,
   "Platforms": "Windows"

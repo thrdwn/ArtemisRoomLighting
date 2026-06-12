@@ -8,5 +8,6 @@ The installer:
 
 - requires administrator permission because Artemis plugins and data live under `C:\ProgramData`
 - creates a timestamped backup before changing the Artemis database or plugin
+- reads the public Artemis Workshop catalog over HTTPS
 - communicates with WiZ bulbs only over the local network
 - listens for CS2 game-state data only on `127.0.0.1`

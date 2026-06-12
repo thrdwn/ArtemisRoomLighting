@@ -12,5 +12,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Payload.zip" LogicalName="ArtemisRoomLighting.Payload.zip" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
   </ItemGroup>
 </Project>
