@@ -87,10 +87,27 @@ internal sealed class InstallerForm : Form
         ForeColor = Color.FromArgb(239, 242, 247);
         Font = new Font("Segoe UI", 9.5f);
 
+        ConfigureInitialControlRanges();
         BuildShell();
         WireSharedEvents();
         ShowStep(0);
         Load += async (_, _) => await LoadStateAsync();
+    }
+
+    private void ConfigureInitialControlRanges()
+    {
+        _displayWidth.Minimum = 640;
+        _displayWidth.Maximum = 7680;
+        _displayWidth.Value = 1920;
+        _displayHeight.Minimum = 480;
+        _displayHeight.Maximum = 4320;
+        _displayHeight.Value = 1080;
+        _watchFps.Minimum = 1;
+        _watchFps.Maximum = 60;
+        _watchFps.Value = 30;
+        _deviceIntensity.Minimum = 0;
+        _deviceIntensity.Maximum = 150;
+        _deviceIntensity.Value = 100;
     }
 
     private void BuildShell()

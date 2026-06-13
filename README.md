@@ -34,7 +34,7 @@ See the [setup and role guide](docs/SETUP_GUIDE.md) for mapping examples.
 
 ## Install
 
-1. Download `ArtemisRoomLightingSetup-0.13.0.0.exe` from the latest release.
+1. Download `ArtemisRoomLightingSetup-0.13.1.0.exe` from the latest release.
 2. Run it and approve the administrator prompt.
 3. Use **Support** to install or enable the providers for your hardware.
 4. Restart Artemis so the devices appear.
@@ -70,7 +70,7 @@ Requirements:
 powershell -ExecutionPolicy Bypass -File .\work\RoomLighting.Installer\Build-Installer.ps1
 ```
 
-The installer is written to `outputs\ArtemisRoomLightingSetup-0.13.0.0.exe`.
+The installer is written to `outputs\ArtemisRoomLightingSetup-0.13.1.0.exe`.
 
 ## License
 

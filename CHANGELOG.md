@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.1.0
+
+- Fixed a startup crash when saved display dimensions load before the Advanced page is opened
+
 ## 0.13.0.0
 
 - Rebuilt the setup assistant as a guided Activity, Devices, Support, Room, and Review wizard
