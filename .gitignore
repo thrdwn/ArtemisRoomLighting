@@ -6,6 +6,7 @@
 outputs/*.exe
 outputs/*.zip
 outputs/GitHub/
+outputs/ZeusPrototype/
 *.user
 *.suo
 *.db
