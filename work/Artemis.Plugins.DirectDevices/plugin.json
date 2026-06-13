@@ -6,7 +6,7 @@
   "Website": "https://artemis-rgb.com/",
   "Icon": "Lightbulb",
   "Description": "Optional direct WiZ and HID compatibility bridge with experimental ambient, CS2, and Valorant integrations.",
-  "Version": "0.12.1.0",
+  "Version": "0.13.0.0",
   "Main": "Artemis.Plugins.DirectDevices.dll",
   "AutoEnableFeatures": false,
   "Platforms": "Windows"

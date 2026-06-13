@@ -22,7 +22,7 @@ jobs:
       - name: Verify embedded payload
         shell: powershell
         run: |
-          $process = Start-Process .\outputs\ArtemisRoomLightingSetup-0.12.1.0.exe -ArgumentList "--verify-payload" -Wait -PassThru
+          $process = Start-Process .\outputs\ArtemisRoomLightingSetup-0.13.0.0.exe -ArgumentList "--verify-payload" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Payload verification failed." }
       - uses: actions/upload-artifact@v4
         with:

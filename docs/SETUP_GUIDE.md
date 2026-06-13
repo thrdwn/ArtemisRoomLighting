@@ -2,22 +2,22 @@
 
 ## Recommended order
 
-1. Open **Plugins** and search for the hardware brand.
-2. Open the selected entry in Artemis.
-3. Install and enable its device-provider feature.
-4. Restart Artemis and confirm the device appears in device settings.
-5. Return to the assistant and refresh detected devices.
-6. Drag each device to its physical direction relative to the main screen.
-7. Assign Watch and game roles.
-8. Apply the setup and inspect the result in the Surface Editor.
+1. Choose **Activity**: Watch, Game, Study, or Custom.
+2. Open **Devices** and confirm detected hardware.
+3. Open **Support** for recommended Artemis plugins and profiles.
+4. Install or enable missing support in Artemis, then restart Artemis if needed.
+5. Return to the assistant and scan again.
+6. Open **Room**, drag each device to its physical position, and choose behavior.
+7. Open **Review** and apply the setup.
+8. Inspect the result in the Artemis Surface Editor that opens afterward.
 
 ## Watch roles
 
 | Role | Behavior | Good use |
 | --- | --- | --- |
-| Screen sample | Full positional Ambilight response | Monitor lamp, keyboard, mouse, desk strip |
-| Soft depth | Positional response at reduced intensity | Rear and side room lights |
-| Base glow | Stable dim neutral light | Bias light or a lamp that should not chase every frame |
+| Screen color | Full positional Ambilight response | Monitor lamp, keyboard, mouse, desk strip |
+| Soft room depth | Positional response at reduced intensity | Rear and side room lights |
+| Gentle glow | Stable dim neutral light | Bias light or a lamp that should not chase every frame |
 | Off | Excluded from Guided Watch | Work-only or distracting devices |
 
 When **Turn mapped lights off for sampled black zones** is disabled, Screen sample and Soft depth devices receive a dim neutral floor so black scenes do not fully extinguish them.
@@ -26,9 +26,9 @@ When **Turn mapped lights off for sampled black zones** is disabled, Screen samp
 
 | Role | CS2 layers |
 | --- | --- |
-| Full game | Menu, CT, T, Damage, Death, Kill |
-| Team ambient | Menu, CT, T |
-| Impact alerts | Damage, Death, Kill |
+| Main game effects | Menu, CT, T, Damage, Death, Kill |
+| Team mood | Menu, CT, T |
+| Impact only | Damage, Death, Kill |
 | Off | No CS2 layers |
 
 The optional compatibility bridge contains additional experimental bomb, flash, fire, smoke, clutch, defuse, detonation, and MVP behavior. Those richer events are separate from the generic official CS2 profile.
@@ -37,7 +37,7 @@ The optional compatibility bridge contains additional experimental bomb, flash, 
 
 The map is direction-based. A device at the top samples the upper screen area; rear-right devices sample the right/lower region and are usually best assigned Soft depth.
 
-Use the Artemis Surface Editor after applying when a multi-LED keyboard, strip, or panel needs exact outline and rotation adjustments.
+Use **Advanced** only when a multi-LED keyboard, strip, or panel needs RGB calibration, capture FPS changes, IP fallback settings, or raw plugin search.
 
 ## Color calibration
 

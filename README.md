@@ -1,19 +1,19 @@
 # Artemis Setup Assistant
 
-A guided setup layer for Artemis RGB. It helps people discover existing Artemis plugins, understand their prerequisites, map devices to their physical room positions, and choose what each device should do in Watch and game profiles.
+A guided setup layer for Artemis RGB. It helps people discover existing Artemis plugins, understand their prerequisites, map devices to their physical room positions, and choose what each device should do in Watch, Game, Study, or Custom setups.
 
 The assistant uses the official Artemis Workshop ecosystem instead of maintaining another copy of every hardware driver. Razer, Corsair, Logitech, SteelSeries, ASUS, Hue, Nanoleaf, WLED, Windows Dynamic Lighting, OpenRGB, and future providers all use the same mapping flow once Artemis detects their devices.
 
 ## What it solves
 
-- Search the live official Workshop catalog from one screen
-- See which plugins are installed and enabled
-- Open any plugin directly in Artemis
-- Detect devices registered by any Artemis provider
-- Drag devices onto a room and screen map
-- Assign Watch roles: Screen sample, Soft depth, Base glow, or Off
-- Assign game roles: Full game, Team ambient, Impact alerts, or Off
-- Set per-device intensity and RGB calibration
+- Walk through a simple Activity -> Devices -> Support -> Room -> Review wizard
+- See recommended plugins for common devices, room lights, Ambilight, CS2, and Valorant
+- Open recommended plugins directly in Artemis
+- Detect and group devices registered by any Artemis provider
+- Drag devices onto a room, screen, desk, and rear-light map
+- Choose plain-language Watch, Game, and Study behavior per device
+- Set per-device brightness from the normal flow
+- Keep RGB calibration, FPS, paths, IPs, and the raw plugin catalog behind Advanced
 - Build a generic `Guided Watch` profile from an imported Ambilight profile
 - Fill the official Counter-Strike 2 profile with the selected devices
 - Back up the Artemis database before every apply
@@ -34,12 +34,12 @@ See the [setup and role guide](docs/SETUP_GUIDE.md) for mapping examples.
 
 ## Install
 
-1. Download `ArtemisRoomLightingSetup-0.12.1.0.exe` from the latest release.
+1. Download `ArtemisRoomLightingSetup-0.13.0.0.exe` from the latest release.
 2. Run it and approve the administrator prompt.
-3. Use **Plugins** to install or enable the providers for your hardware.
+3. Use **Support** to install or enable the providers for your hardware.
 4. Restart Artemis so the devices appear.
-5. Use **Devices and room map** to place each device and assign its roles.
-6. Choose **Apply setup**.
+5. Use **Devices** and **Room** to place each device and assign its behavior.
+6. Review the setup, then choose **Apply setup**.
 7. Make any final outline adjustments in the Artemis Surface Editor that opens afterward.
 
 The installer does not require a GitHub login, API key, or personal credentials.
@@ -70,7 +70,7 @@ Requirements:
 powershell -ExecutionPolicy Bypass -File .\work\RoomLighting.Installer\Build-Installer.ps1
 ```
 
-The installer is written to `outputs\ArtemisRoomLightingSetup-0.12.1.0.exe`.
+The installer is written to `outputs\ArtemisRoomLightingSetup-0.13.0.0.exe`.
 
 ## License
 

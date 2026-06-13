@@ -48,31 +48,57 @@ internal sealed class RoomMapControl : Control
         Graphics graphics = e.Graphics;
         graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         Rectangle room = new(14, 14, Math.Max(1, Width - 28), Math.Max(1, Height - 28));
-        using Pen border = new(Color.FromArgb(73, 80, 91), 2);
+        using SolidBrush roomBrush = new(Color.FromArgb(28, 32, 38));
+        graphics.FillRectangle(roomBrush, room);
+        using Pen border = new(Color.FromArgb(78, 88, 103), 2);
         graphics.DrawRectangle(border, room);
 
         Rectangle monitor = new(
             room.Left + room.Width / 4,
-            room.Top + room.Height / 4,
+            room.Top + room.Height / 5,
             room.Width / 2,
-            room.Height / 3);
+            room.Height / 4);
+        Rectangle desk = new(
+            room.Left + room.Width / 5,
+            monitor.Bottom + room.Height / 14,
+            room.Width * 3 / 5,
+            room.Height / 7);
+        Rectangle rear = new(
+            room.Left + 8,
+            room.Bottom - room.Height / 5,
+            room.Width - 16,
+            room.Height / 5 - 8);
+        using SolidBrush rearBrush = new(Color.FromArgb(35, 42, 48));
+        using SolidBrush sideBrush = new(Color.FromArgb(31, 37, 45));
+        using SolidBrush deskBrush = new(Color.FromArgb(60, 48, 36));
+        graphics.FillRectangle(sideBrush, room.Left + 8, room.Top + 8, room.Width / 7, room.Height - 16);
+        graphics.FillRectangle(sideBrush, room.Right - room.Width / 7 - 8, room.Top + 8, room.Width / 7, room.Height - 16);
+        graphics.FillRectangle(rearBrush, rear);
+        graphics.FillRectangle(deskBrush, desk);
         using SolidBrush monitorBrush = new(Color.FromArgb(46, 54, 65));
         graphics.FillRectangle(monitorBrush, monitor);
         graphics.DrawRectangle(Pens.DimGray, monitor);
         using Font small = new("Segoe UI", 8);
         using SolidBrush textBrush = new(Color.FromArgb(178, 186, 197));
         graphics.DrawString("Main screen", small, textBrush, monitor.Left + 8, monitor.Top + 7);
+        graphics.DrawString("Desk", small, textBrush, desk.Left + 8, desk.Top + 7);
+        graphics.DrawString("Rear room", small, textBrush, rear.Left + 8, rear.Top + 7);
+        graphics.DrawString("Left", small, textBrush, room.Left + 14, room.Top + 12);
+        graphics.DrawString("Right", small, textBrush, room.Right - 52, room.Top + 12);
 
-        foreach (DeviceAssignment device in _devices.Where(item => item.Enabled))
+        foreach (DeviceAssignment device in _devices)
         {
             Point point = ToPoint(device.RoomX, device.RoomY);
             bool selected = ReferenceEquals(device, _selected);
             int radius = selected ? 9 : 7;
-            using SolidBrush fill = new(selected ? Color.FromArgb(118, 165, 235) : RoleColor(device.WatchRole));
+            using SolidBrush fill = new(selected
+                ? Color.FromArgb(118, 165, 235)
+                : device.Enabled ? KindColor(device.DeviceKind) : Color.FromArgb(88, 92, 100));
             graphics.FillEllipse(fill, point.X - radius, point.Y - radius, radius * 2, radius * 2);
             graphics.DrawEllipse(Pens.White, point.X - radius, point.Y - radius, radius * 2, radius * 2);
             string label = device.FriendlyName.Length > 18 ? device.FriendlyName[..18] + "..." : device.FriendlyName;
-            graphics.DrawString(label, small, textBrush, point.X + 10, point.Y - 8);
+            using SolidBrush labelBrush = new(device.Enabled ? Color.FromArgb(214, 221, 232) : Color.FromArgb(138, 144, 154));
+            graphics.DrawString(label, small, labelBrush, point.X + 10, point.Y - 8);
         }
     }
 
@@ -80,7 +106,6 @@ internal sealed class RoomMapControl : Control
     {
         base.OnMouseDown(e);
         _dragging = _devices
-            .Where(device => device.Enabled)
             .OrderBy(device => Distance(ToPoint(device.RoomX, device.RoomY), e.Location))
             .FirstOrDefault(device => Distance(ToPoint(device.RoomX, device.RoomY), e.Location) <= 22);
         _selected = _dragging;
@@ -97,6 +122,8 @@ internal sealed class RoomMapControl : Control
         Rectangle room = new(14, 14, Math.Max(1, Width - 28), Math.Max(1, Height - 28));
         _dragging.RoomX = Math.Clamp((e.X - room.Left) / (double)room.Width, 0, 1);
         _dragging.RoomY = Math.Clamp((e.Y - room.Top) / (double)room.Height, 0, 1);
+        _dragging.PhysicalZone = ZoneFromPosition(_dragging.RoomX, _dragging.RoomY);
+        _dragging.Placement = SetupLabels.PlacementFromZone(_dragging.PhysicalZone);
         DeviceMoved?.Invoke(this, EventArgs.Empty);
         Invalidate();
     }
@@ -122,11 +149,29 @@ internal sealed class RoomMapControl : Control
         return Math.Sqrt(x * x + y * y);
     }
 
-    private static Color RoleColor(string role) => role switch
+    private static string ZoneFromPosition(double x, double y)
     {
-        "Soft depth" => Color.FromArgb(95, 180, 150),
-        "Base glow" => Color.FromArgb(220, 165, 78),
-        "Off" => Color.FromArgb(98, 102, 110),
-        _ => Color.FromArgb(224, 92, 104)
+        if (y < 0.22 && x is > 0.28 and < 0.72)
+            return "Screen top";
+        if (y is > 0.48 and < 0.68 && x is > 0.25 and < 0.75)
+            return "Desk";
+        if (y > 0.78)
+            return x < 0.5 ? "Rear left" : "Rear right";
+        if (x < 0.22)
+            return "Left";
+        if (x > 0.78)
+            return "Right";
+        if (y > 0.58)
+            return "Screen bottom";
+        return "Room";
+    }
+
+    private static Color KindColor(string kind) => kind switch
+    {
+        "Light" => Color.FromArgb(250, 194, 95),
+        "Keyboard" => Color.FromArgb(118, 184, 255),
+        "Mouse" => Color.FromArgb(194, 120, 235),
+        "Dock" => Color.FromArgb(120, 218, 178),
+        _ => Color.FromArgb(178, 186, 197)
     };
 }

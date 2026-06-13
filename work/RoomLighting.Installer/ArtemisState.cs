@@ -66,8 +66,12 @@ internal static class ArtemisState
             return new SetupConfiguration();
         try
         {
-            return JsonSerializer.Deserialize<SetupConfiguration>(File.ReadAllText(ConfigurationPath), JsonOptions)
+            SetupConfiguration configuration = JsonSerializer.Deserialize<SetupConfiguration>(
+                    File.ReadAllText(ConfigurationPath),
+                    JsonOptions)
                 ?? new SetupConfiguration();
+            MigrateConfiguration(configuration);
+            return configuration;
         }
         catch
         {
@@ -115,7 +119,7 @@ internal static class ArtemisState
 
             double roomX = Math.Clamp(reader.GetDouble(2) / 1600d, 0, 1);
             double roomY = Math.Clamp(reader.GetDouble(3) / 900d, 0, 1);
-            devices.Add(new DeviceAssignment
+            DeviceAssignment newAssignment = new()
             {
                 DeviceId = id,
                 FriendlyName = FriendlyDeviceName(id),
@@ -123,6 +127,7 @@ internal static class ArtemisState
                 ProviderName = providerNames.GetValueOrDefault(providerGuid, "Unknown provider"),
                 Enabled = reader.GetBoolean(7),
                 Placement = GuessPlacement(roomX, roomY),
+                PhysicalZone = GuessPlacement(roomX, roomY),
                 WatchRole = "Screen sample",
                 GameRole = "Full game",
                 Intensity = 100,
@@ -131,7 +136,15 @@ internal static class ArtemisState
                 RedScale = reader.GetDouble(4),
                 GreenScale = reader.GetDouble(5),
                 BlueScale = reader.GetDouble(6)
-            });
+            };
+            newAssignment.DeviceKind = SetupLabels.GuessDeviceKind(
+                $"{newAssignment.FriendlyName} {newAssignment.DeviceId} {newAssignment.ProviderName}");
+            newAssignment.ModeAssignments.Watch = SetupLabels.ToFriendlyWatch(newAssignment.WatchRole);
+            newAssignment.ModeAssignments.Game = SetupLabels.ToFriendlyGame(newAssignment.GameRole);
+            newAssignment.ModeAssignments.Study = newAssignment.DeviceKind == "Light"
+                ? SetupLabels.StudyBrightDesk
+                : SetupLabels.StudyCalmGlow;
+            devices.Add(newAssignment);
         }
 
         return devices;
@@ -292,6 +305,46 @@ internal static class ArtemisState
         foreach ((string guid, (string name, _, _)) in LoadInstalledPlugins())
             result[guid] = name;
         return result;
+    }
+
+    private static void MigrateConfiguration(SetupConfiguration configuration)
+    {
+        bool legacy = configuration.Version < 2;
+        if (configuration.AdvancedSettings == null)
+            configuration.AdvancedSettings = new AdvancedSettings();
+
+        configuration.AdvancedSettings.WatchFps = configuration.WatchFps;
+        configuration.AdvancedSettings.BlackoutOnBlack = configuration.BlackoutOnBlack;
+        configuration.AdvancedSettings.InstallCs2Gsi = configuration.InstallCs2Gsi;
+        configuration.AdvancedSettings.CreateShortcuts = configuration.CreateShortcuts;
+        configuration.AdvancedSettings.UseDirectBridge = configuration.UseDirectBridge;
+        configuration.AdvancedSettings.StudyIp = configuration.StudyIp;
+        configuration.AdvancedSettings.UpperIp = configuration.UpperIp;
+        configuration.AdvancedSettings.LowerIp = configuration.LowerIp;
+
+        foreach (DeviceAssignment device in configuration.Devices)
+        {
+            string deviceText = $"{device.FriendlyName} {device.DeviceId} {device.ProviderName}";
+            if (legacy || string.IsNullOrWhiteSpace(device.DeviceKind) || device.DeviceKind == "Unknown")
+                device.DeviceKind = SetupLabels.GuessDeviceKind(deviceText);
+            if (legacy || string.IsNullOrWhiteSpace(device.PhysicalZone))
+                device.PhysicalZone = SetupLabels.ZoneFromPlacement(device.Placement);
+            if (string.IsNullOrWhiteSpace(device.Placement))
+                device.Placement = SetupLabels.PlacementFromZone(device.PhysicalZone);
+            if (device.ModeAssignments == null)
+                device.ModeAssignments = new ModeAssignments();
+            if (legacy || string.IsNullOrWhiteSpace(device.ModeAssignments.Watch))
+                device.ModeAssignments.Watch = SetupLabels.ToFriendlyWatch(device.WatchRole);
+            if (legacy || string.IsNullOrWhiteSpace(device.ModeAssignments.Game))
+                device.ModeAssignments.Game = SetupLabels.ToFriendlyGame(device.GameRole);
+            if (legacy || string.IsNullOrWhiteSpace(device.ModeAssignments.Study))
+                device.ModeAssignments.Study = device.WatchRole == "Off" ? SetupLabels.StudyOff : SetupLabels.StudyCalmGlow;
+            device.WatchRole = SetupLabels.ToWatchRole(device.ModeAssignments.Watch);
+            device.GameRole = SetupLabels.ToGameRole(device.ModeAssignments.Game);
+            device.Placement = SetupLabels.PlacementFromZone(device.PhysicalZone);
+        }
+
+        configuration.Version = 2;
     }
 
     private static string FriendlyDeviceName(string id)

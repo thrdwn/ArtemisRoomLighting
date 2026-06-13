@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.0.0
+
+- Rebuilt the setup assistant as a guided Activity, Devices, Support, Room, and Review wizard
+- Added plain-language Watch, Game, and Study behavior choices for each device
+- Added device grouping for lights, room lights, keyboard/mouse devices, and unknown devices
+- Added recommendation cards for common Artemis plugins like Razer, smart lights, Ambilight, CS2, and Valorant
+- Made the room map the primary setup surface with screen, desk, side, and rear zones
+- Added v2 setup configuration with device kind, physical zone, mode assignments, and advanced settings
+- Added automatic migration for existing v1 setup files
+- Moved raw plugin search, RGB calibration, display/FPS, CS2 path, and direct WiZ bridge settings behind Advanced
+
 ## 0.12.1.0
 
 - Added a simple Home screen with Watch, Game, and Desk presets
