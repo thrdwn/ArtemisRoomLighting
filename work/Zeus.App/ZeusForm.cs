@@ -8,10 +8,12 @@ internal sealed class ZeusForm : Form
     private readonly Label _subtitle = new();
     private readonly Label _status = new();
     private readonly List<Button> _navButtons = [];
+    private readonly List<Button> _modeButtons = [];
     private readonly List<ZeusDevice> _devices = SeedDevices();
     private readonly List<ZeusProfile> _profiles = SeedProfiles();
     private readonly List<ZeusBackend> _backends = SeedBackends();
     private readonly RoomCanvas _roomCanvas = new();
+    private readonly RoomCanvas _overviewCanvas = new();
 
     private ZeusDevice? _selectedDevice;
     private string _activePage = "Home";
@@ -19,103 +21,132 @@ internal sealed class ZeusForm : Form
 
     public ZeusForm()
     {
-        Text = "Zeus Lighting Prototype";
-        ClientSize = new Size(1320, 820);
-        MinimumSize = new Size(1140, 720);
+        Text = "Zeus Lighting";
+        AutoScaleMode = AutoScaleMode.None;
+        ClientSize = new Size(1280, 800);
+        MinimumSize = new Size(1080, 720);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.FromArgb(16, 19, 23);
-        ForeColor = Color.FromArgb(238, 242, 246);
-        Font = new Font("Segoe UI", 9.5f);
+        BackColor = ZeusTheme.Background;
+        ForeColor = ZeusTheme.Text;
+        Font = ZeusTheme.BodyFont();
 
-        BuildShell();
-        Navigate("Home");
         _selectedDevice = _devices[0];
+        BuildShell();
         _roomCanvas.Devices = _devices;
         _roomCanvas.SelectedDevice = _selectedDevice;
-        _roomCanvas.SelectedDeviceChanged += (_, device) =>
+        _overviewCanvas.Devices = _devices;
+        _overviewCanvas.SelectedDevice = _selectedDevice;
+
+        foreach (RoomCanvas canvas in new[] { _roomCanvas, _overviewCanvas })
         {
-            _selectedDevice = device;
-            if (_activePage == "Room")
-                Navigate("Room");
-        };
-        _roomCanvas.DeviceMoved += (_, _) =>
-        {
-            if (_selectedDevice != null)
-                _status.Text = $"{_selectedDevice.Name} moved to {_selectedDevice.Zone}.";
-        };
+            canvas.SelectedDeviceChanged += (_, device) =>
+            {
+                _selectedDevice = device;
+                _roomCanvas.SelectedDevice = device;
+                _overviewCanvas.SelectedDevice = device;
+                if (_activePage == "Room")
+                    Navigate("Room");
+                else if (device != null)
+                    _status.Text = $"{device.Name} selected. Open Room to place it or change behavior.";
+            };
+            canvas.DeviceMoved += (_, _) =>
+            {
+                if (_selectedDevice != null)
+                    _status.Text = $"{_selectedDevice.Name} moved to {_selectedDevice.Zone}.";
+                _overviewCanvas.Invalidate();
+                _roomCanvas.Invalidate();
+            };
+        }
+
+        Navigate("Home");
     }
 
     private void BuildShell()
     {
-        _title.Text = "Zeus";
-        _title.Location = new Point(24, 18);
-        _title.Size = new Size(280, 38);
-        _title.Font = new Font("Segoe UI Semibold", 24);
-        _title.ForeColor = Color.White;
+        _title.Text = "Zeus Lighting";
+        _title.Location = new Point(24, 16);
+        _title.Size = new Size(300, 38);
+        _title.Font = ZeusTheme.DisplayFont();
+        _title.ForeColor = ZeusTheme.Text;
         Controls.Add(_title);
 
-        _subtitle.Text = "Lighting that starts simple, then lets you go deep.";
-        _subtitle.Location = new Point(28, 58);
+        _subtitle.Text = "Pick a mode, place each light, test the room.";
+        _subtitle.Location = new Point(28, 56);
         _subtitle.Size = new Size(620, 24);
-        _subtitle.ForeColor = Color.FromArgb(170, 181, 192);
+        _subtitle.ForeColor = ZeusTheme.TextMuted;
         Controls.Add(_subtitle);
 
-        _nav.Location = new Point(18, 102);
-        _nav.Size = new Size(216, 642);
+        _nav.Location = new Point(18, 96);
+        _nav.Size = new Size(220, 644);
         _nav.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
-        _nav.BackColor = Color.FromArgb(24, 29, 35);
+        _nav.BackColor = ZeusTheme.Surface;
         Controls.Add(_nav);
 
         string[] pages = ["Home", "Room", "Devices", "Profiles", "Plugins", "Performance"];
         for (int i = 0; i < pages.Length; i++)
         {
-            Button button = new()
+            Button button = new ZeusButton()
             {
                 Text = pages[i],
                 Tag = pages[i],
-                Location = new Point(14, 18 + i * 52),
-                Size = new Size(188, 40),
+                Location = new Point(14, 16 + i * 50),
+                Size = new Size(192, 40),
                 TextAlign = ContentAlignment.MiddleLeft,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI Semibold", 10),
-                ForeColor = Color.White
+                Font = ZeusTheme.LabelFont(10),
+                ForeColor = ZeusTheme.Text
             };
-            button.FlatAppearance.BorderSize = 1;
             button.Click += (_, _) => Navigate((string)button.Tag);
             _navButtons.Add(button);
             _nav.Controls.Add(button);
         }
 
-        Label hint = new()
+        Label railTitle = new()
         {
-            Text = "Normal users see names, rooms, modes, and tests. Device IDs and backend details stay behind troubleshooting.",
-            Location = new Point(16, 360),
-            Size = new Size(180, 100),
-            ForeColor = Color.FromArgb(150, 162, 175)
+            Text = "Connected",
+            Location = new Point(18, 350),
+            Size = new Size(170, 22),
+            Font = ZeusTheme.LabelFont(9.5f),
+            ForeColor = ZeusTheme.Text
         };
-        _nav.Controls.Add(hint);
+        _nav.Controls.Add(railTitle);
 
-        _content.Location = new Point(252, 102);
-        _content.Size = new Size(1046, 642);
+        AddRailChip("7 devices", 18, 382, ZeusTheme.Success);
+        AddRailChip("Artemis ready", 18, 422, ZeusTheme.Blue);
+        AddRailChip("WiZ LAN", 18, 462, ZeusTheme.Amber);
+
+        _content.Location = new Point(254, 96);
+        _content.Size = new Size(1008, 644);
         _content.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        _content.BackColor = Color.FromArgb(20, 24, 29);
+        _content.BackColor = ZeusTheme.Surface;
         Controls.Add(_content);
 
-        _status.Location = new Point(24, 762);
-        _status.Size = new Size(920, 30);
+        _status.Location = new Point(28, 762);
+        _status.Size = new Size(930, 30);
         _status.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        _status.ForeColor = Color.FromArgb(168, 180, 193);
-        _status.Text = "Prototype only: UI, mapping model, profile flow, and backend plan. Live device control comes next.";
+        _status.ForeColor = ZeusTheme.TextMuted;
+        _status.Text = "Ready. Start a mode or flash a device to identify it.";
         Controls.Add(_status);
 
-        Button switchMode = HeaderButton("Switch mode", 1032, 28, 122);
-        switchMode.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        switchMode.Click += (_, _) => Navigate("Home");
-        Controls.Add(switchMode);
+        Button watch = HeaderButton("Watch", 580, 27, 92);
+        Button cs2 = HeaderButton("CS2", 680, 27, 72);
+        Button study = HeaderButton("Study", 760, 27, 82);
+        foreach (Button modeButton in new[] { watch, cs2, study })
+        {
+            modeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            modeButton.Tag = modeButton.Text;
+            modeButton.Click += (_, _) =>
+            {
+                _activeMode = (string)modeButton.Tag;
+                _status.Text = $"{_activeMode} mode selected.";
+                Navigate(_activePage);
+            };
+            _modeButtons.Add(modeButton);
+            Controls.Add(modeButton);
+        }
 
-        Button testRoom = HeaderButton("Test room", 1164, 28, 112);
+        Button testRoom = HeaderButton("Test", 850, 27, 92);
         testRoom.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        testRoom.Click += (_, _) => _status.Text = "Test pattern: each zone would flash one by one, then show red, green, blue, orange, and skin-tone checks.";
+        testRoom.Click += (_, _) => _status.Text = "Room test: flash each zone, then check red, green, blue, orange, teal, warm white, cool white, skin tone, and black.";
         Controls.Add(testRoom);
     }
 
@@ -125,8 +156,15 @@ internal sealed class ZeusForm : Form
         foreach (Button button in _navButtons)
         {
             bool active = (button.Tag as string) == page;
-            button.BackColor = active ? Color.FromArgb(55, 111, 166) : Color.FromArgb(35, 41, 49);
-            button.FlatAppearance.BorderColor = active ? Color.FromArgb(145, 201, 232) : Color.FromArgb(70, 80, 92);
+            if (button is ZeusButton zeusButton)
+                zeusButton.Active = active;
+            button.Invalidate();
+        }
+        foreach (Button button in _modeButtons)
+        {
+            if (button is ZeusButton zeusButton)
+                zeusButton.Active = string.Equals((string?)button.Tag, _activeMode, StringComparison.OrdinalIgnoreCase);
+            button.Invalidate();
         }
 
         _content.Controls.Clear();
@@ -143,55 +181,36 @@ internal sealed class ZeusForm : Form
 
     private Control BuildHomePage()
     {
-        Panel page = Page("Control center", "One click when you want it, detailed freedom when you need it.");
+        Panel page = Page("Start", "Choose the experience, then place lights in the room.");
 
-        string[,] modes =
-        {
-            { "Watch", "Movies, YouTube, shows", "Screen zones drive lights. Black can turn lights off. Rear lights stay cinematic." },
-            { "CS2", "Competitive immersion", "Bomb, flash, fire, smoke, health, ammo, clutch, death, MVP, and round state." },
-            { "Valorant", "Agent and match mood", "Map mood, spike pressure, damage, flash, death, and victory moments." },
-            { "Study", "Bright and calm", "Study lamp stays comfortable; room and peripherals can remain soft or off." }
-        };
+        Panel room = Card(24, 104, 720, 396);
+        AddLabel(room, "Room at a glance", 18, 16, 260, 28, 14, true);
+        AddMuted(room, "Drag on the Room page. Click a bubble here to select it.", 20, 46, 430, 22);
+        AddStatusChip(room, _activeMode + " active", 566, 18, 118, ZeusTheme.Action);
 
-        for (int i = 0; i < modes.GetLength(0); i++)
-        {
-            Panel card = Card(24 + (i % 2) * 330, 104 + (i / 2) * 152, 300, 126);
-            card.BackColor = modes[i, 0] == _activeMode ? Color.FromArgb(38, 72, 94) : Color.FromArgb(29, 35, 42);
-            AddLabel(card, modes[i, 0], 16, 14, 230, 26, 13, true);
-            AddMuted(card, modes[i, 1], 16, 42, 250, 22);
-            AddMuted(card, modes[i, 2], 16, 70, 262, 42);
-            Button start = SmallButton(card, modes[i, 0] == _activeMode ? "Running" : "Start", 208, 14, 74);
-            string mode = modes[i, 0];
-            start.Click += (_, _) =>
-            {
-                _activeMode = mode;
-                _status.Text = $"{mode} mode selected. One-click switch would apply device roles and start auto rules.";
-                Navigate("Home");
-            };
-            page.Controls.Add(card);
-        }
+        if (_overviewCanvas.Parent != null)
+            _overviewCanvas.Parent.Controls.Remove(_overviewCanvas);
+        _overviewCanvas.Location = new Point(18, 82);
+        _overviewCanvas.Size = new Size(682, 250);
+        _overviewCanvas.Devices = _devices;
+        _overviewCanvas.SelectedDevice = _selectedDevice;
+        room.Controls.Add(_overviewCanvas);
 
-        Panel steps = Card(684, 104, 324, 278);
-        AddLabel(steps, "Visual setup", 18, 18, 260, 28, 13, true);
-        AddStep(steps, 1, "Identify devices", "Press Flash. Name the light you see.", 58);
-        AddStep(steps, 2, "Place them", "Drag each bubble onto the room map.", 110);
-        AddStep(steps, 3, "Choose behavior", "Screen color, game events, calm glow, or off.", 162);
-        AddStep(steps, 4, "Test odd colors", "Orange, teal, skin tones, black scenes.", 214);
-        page.Controls.Add(steps);
+        Button flashAll = SmallButton(room, "Flash all", 18, 344, 96);
+        flashAll.Click += (_, _) => _status.Text = "Flash all: devices would pulse one by one so you can name each physical light.";
+        Button editRoom = SmallButton(room, "Place devices", 126, 344, 126);
+        editRoom.Click += (_, _) => Navigate("Room");
+        Button testColors = SmallButton(room, "Color test", 264, 344, 112);
+        testColors.Click += (_, _) => _status.Text = "Color test queued: orange, teal, warm white, cool white, skin tone, black.";
+        page.Controls.Add(room);
 
-        Panel current = Card(24, 428, 984, 152);
-        AddLabel(current, "Your current idea", 18, 16, 320, 28, 13, true);
-        AddMuted(
-            current,
-            "3 WiZ lights, 3 Razer devices, and Lenovo laptop lighting. Watch mode uses positional screen zones. CS2 uses game state plus room intensity. New strips, ceiling lights, and future devices become more draggable bubbles.",
-            18,
-            50,
-            610,
-            58);
-        AddLoadPill(current, "Screen sampler", "Low-res shared capture", 662, 26);
-        AddLoadPill(current, "WiZ bulbs", "10 to 20 FPS practical", 662, 72);
-        AddLoadPill(current, "Keyboard", "Per-key high detail", 662, 118);
-        page.Controls.Add(current);
+        Panel flow = Card(24, 522, 720, 92);
+        AddLabel(flow, "Setup path", 18, 18, 126, 24, 12, true);
+        AddMiniStep(flow, "1", "Flash", "Find each device", 142);
+        AddMiniStep(flow, "2", "Name", "Friendly labels", 286);
+        AddMiniStep(flow, "3", "Place", "Map the room", 430);
+        AddMiniStep(flow, "4", "Run", "Start profile", 574);
+        page.Controls.Add(flow);
 
         return page;
     }
@@ -200,14 +219,53 @@ internal sealed class ZeusForm : Form
     {
         Panel page = Page("Room map", "Put devices where they physically are. The light behavior follows this map.");
 
-        _roomCanvas.Location = new Point(24, 104);
-        _roomCanvas.Size = new Size(656, 470);
+        Panel mapCard = Card(24, 104, 480, 470);
+        AddLabel(mapCard, "Physical placement", 18, 16, 260, 28, 14, true);
+        AddMuted(mapCard, "Click a bubble, then drag it to the real location.", 20, 46, 350, 22);
+        AddStatusChip(mapCard, $"{_devices.Count(d => d.Enabled)} active", 344, 18, 104, ZeusTheme.Success);
+
+        if (_roomCanvas.Parent != null)
+            _roomCanvas.Parent.Controls.Remove(_roomCanvas);
+        _roomCanvas.Location = new Point(18, 82);
+        _roomCanvas.Size = new Size(442, 300);
         _roomCanvas.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
         _roomCanvas.Devices = _devices;
         _roomCanvas.SelectedDevice = _selectedDevice;
-        page.Controls.Add(_roomCanvas);
+        mapCard.Controls.Add(_roomCanvas);
 
-        Panel editor = Card(704, 104, 304, 470);
+        FlowLayoutPanel chips = new()
+        {
+            Location = new Point(18, 394),
+            Size = new Size(442, 58),
+            BackColor = Color.Transparent,
+            AutoScroll = true,
+            WrapContents = false
+        };
+        foreach (ZeusDevice device in _devices)
+        {
+            ZeusChip chip = new()
+            {
+                Text = device.Name,
+                Size = new Size(Math.Clamp(device.Name.Length * 8 + 36, 110, 190), 32),
+                Margin = new Padding(0, 0, 8, 8),
+                FillColor = ReferenceEquals(device, _selectedDevice) ? ZeusTheme.Action : DeviceAccent(device.Kind),
+                ForeColor = ReferenceEquals(device, _selectedDevice) ? ZeusTheme.TextInverse : ZeusTheme.TextInverse,
+                Cursor = Cursors.Hand
+            };
+            chip.Click += (_, _) =>
+            {
+                _selectedDevice = device;
+                _roomCanvas.SelectedDevice = device;
+                _overviewCanvas.SelectedDevice = device;
+                _status.Text = $"{device.Name} selected.";
+                Navigate("Room");
+            };
+            chips.Controls.Add(chip);
+        }
+        mapCard.Controls.Add(chips);
+        page.Controls.Add(mapCard);
+
+        Panel editor = Card(520, 104, 304, 470);
         if (_selectedDevice == null)
         {
             AddLabel(editor, "Select a device", 18, 18, 240, 28, 13, true);
@@ -221,9 +279,10 @@ internal sealed class ZeusForm : Form
 
             Button flash = SmallButton(editor, "Flash", 214, 18, 70);
             flash.Click += (_, _) => _status.Text = $"{device.Name} would flash so the user can identify it physically.";
+            AddStatusChip(editor, device.Enabled ? "Enabled" : "Off", 18, 74, 86, device.Enabled ? ZeusTheme.Success : ZeusTheme.Danger);
 
-            AddMuted(editor, "Zone", 18, 86, 70, 22);
-            ComboBox zone = Combo(editor, ["Screen top", "Screen bottom", "Desk", "Rear left", "Rear right", "Left wall", "Right wall", "Ceiling", "Room"], device.Zone, 96, 82, 176);
+            AddMuted(editor, "Zone", 18, 116, 70, 22);
+            ComboBox zone = Combo(editor, ["Screen top", "Screen bottom", "Desk", "Rear left", "Rear right", "Left wall", "Right wall", "Ceiling", "Room"], device.Zone, 96, 112, 176);
             zone.SelectedIndexChanged += (_, _) =>
             {
                 device.Zone = zone.SelectedItem?.ToString() ?? device.Zone;
@@ -232,22 +291,22 @@ internal sealed class ZeusForm : Form
                 _status.Text = $"{device.Name} assigned to {device.Zone}.";
             };
 
-            AddMuted(editor, "Watch", 18, 132, 70, 22);
-            Combo(editor, ["Screen zone", "Soft depth", "Bias glow", "Off"], device.WatchRole, 96, 128, 176)
+            AddMuted(editor, "Watch", 18, 162, 70, 22);
+            Combo(editor, ["Screen zone", "Soft depth", "Bias glow", "Off"], device.WatchRole, 96, 158, 176)
                 .SelectedIndexChanged += (_, _) => _status.Text = "Watch behavior changed. Live profile save comes next.";
 
-            AddMuted(editor, "Game", 18, 178, 70, 22);
-            Combo(editor, ["Full game mix", "Impact only", "Objective only", "Health/damage", "Off"], device.GameRole, 96, 174, 176)
+            AddMuted(editor, "Game", 18, 208, 70, 22);
+            Combo(editor, ["Full game mix", "Impact only", "Objective only", "Health/damage", "Off"], device.GameRole, 96, 204, 176)
                 .SelectedIndexChanged += (_, _) => _status.Text = "Game behavior changed. Live profile save comes next.";
 
-            AddMuted(editor, "Brightness", 18, 226, 90, 22);
+            AddMuted(editor, "Brightness", 18, 256, 90, 22);
             TrackBar brightness = new()
             {
                 Minimum = 0,
                 Maximum = 150,
                 TickFrequency = 25,
                 Value = Math.Clamp(device.Brightness, 0, 150),
-                Location = new Point(96, 216),
+                Location = new Point(96, 246),
                 Size = new Size(176, 44)
             };
             brightness.Scroll += (_, _) =>
@@ -257,13 +316,13 @@ internal sealed class ZeusForm : Form
             };
             editor.Controls.Add(brightness);
 
-            AddMuted(editor, "FPS cap", 18, 278, 90, 22);
-            Combo(editor, ["5", "10", "20", "30", "60"], device.FpsCap.ToString(), 96, 274, 176)
+            AddMuted(editor, "FPS cap", 18, 306, 90, 22);
+            Combo(editor, ["5", "10", "20", "30", "60"], device.FpsCap.ToString(), 96, 302, 176)
                 .SelectedIndexChanged += (_, _) => _status.Text = "FPS cap changed. Zeus will cap per backend to avoid load.";
 
-            Button colorTest = SmallButton(editor, "Color test", 18, 338, 116);
+            Button colorTest = SmallButton(editor, "Color test", 18, 366, 116);
             colorTest.Click += (_, _) => _status.Text = $"{device.Name} would test red, green, blue, orange, teal, warm white, cool white, and black.";
-            Button off = SmallButton(editor, device.Enabled ? "Disable" : "Enable", 148, 338, 116);
+            Button off = SmallButton(editor, device.Enabled ? "Disable" : "Enable", 148, 366, 116);
             off.Click += (_, _) =>
             {
                 device.Enabled = !device.Enabled;
@@ -271,8 +330,8 @@ internal sealed class ZeusForm : Form
                 Navigate("Room");
             };
 
-            AddMuted(editor, "Instruction", 18, 398, 260, 22);
-            AddMuted(editor, "The user only needs to flash, name, drag, test color, then pick what this device does in each mode.", 18, 422, 250, 42);
+            AddMuted(editor, "Role preview", 18, 424, 260, 22);
+            AddMuted(editor, $"{device.Name} is a {device.Zone.ToLowerInvariant()} device for {_activeMode}.", 18, 446, 250, 22);
         }
         page.Controls.Add(editor);
 
@@ -298,7 +357,7 @@ internal sealed class ZeusForm : Form
             Location = new Point(24, 104),
             Size = new Size(984, 470),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-            BackColor = Color.FromArgb(20, 24, 29),
+            BackColor = ZeusTheme.Surface,
             AutoScroll = true
         };
         page.Controls.Add(list);
@@ -312,13 +371,21 @@ internal sealed class ZeusForm : Form
             foreach (ZeusDevice device in group)
             {
                 Label name = AddLabel(groupPanel, device.Name, 16, y, 180, 22, 9.5f, true);
-                name.ForeColor = device.Enabled ? Color.White : Color.FromArgb(140, 150, 160);
+                name.ForeColor = device.Enabled ? ZeusTheme.Text : ZeusTheme.TextMuted;
                 AddMuted(groupPanel, $"{device.Backend} - {device.Zone}", 16, y + 22, 190, 20);
                 Button flash = SmallButton(groupPanel, "Flash", 216, y + 6, 68);
                 flash.Click += (_, _) =>
                 {
                     _selectedDevice = device;
                     _status.Text = $"{device.Name} would flash now. This is how a normal user identifies it.";
+                };
+                Button place = SmallButton(groupPanel, "Place", 216, y + 34, 68);
+                place.Click += (_, _) =>
+                {
+                    _selectedDevice = device;
+                    _roomCanvas.SelectedDevice = device;
+                    _overviewCanvas.SelectedDevice = device;
+                    Navigate("Room");
                 };
                 y += 58;
             }
@@ -343,7 +410,7 @@ internal sealed class ZeusForm : Form
             Location = new Point(24, 104),
             Size = new Size(620, 470),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left,
-            BackColor = Color.FromArgb(20, 24, 29),
+            BackColor = ZeusTheme.Surface,
             AutoScroll = true
         };
         page.Controls.Add(list);
@@ -358,6 +425,8 @@ internal sealed class ZeusForm : Form
             AddMuted(card, "Devices: " + profile.PrimaryDevices, 16, 92, 520, 20);
             AddMuted(card, "Room: " + profile.RoomBehavior, 16, 114, 520, 20);
             Button run = SmallButton(card, profile.Name == _activeMode ? "Running" : "Run", 482, 16, 70);
+            if (run is ZeusButton runButton)
+                runButton.Active = profile.Name == _activeMode;
             run.Click += (_, _) =>
             {
                 _activeMode = profile.Name;
@@ -389,7 +458,7 @@ internal sealed class ZeusForm : Form
             Location = new Point(24, 104),
             Size = new Size(984, 470),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-            BackColor = Color.FromArgb(20, 24, 29),
+            BackColor = ZeusTheme.Surface,
             AutoScroll = true
         };
         page.Controls.Add(list);
@@ -400,7 +469,7 @@ internal sealed class ZeusForm : Form
             card.Margin = new Padding(8);
             AddLabel(card, backend.Name, 16, 14, 220, 26, 12, true);
             Label status = AddMuted(card, backend.Status, 16, 42, 240, 22);
-            status.ForeColor = backend.Recommended ? Color.FromArgb(126, 219, 165) : Color.FromArgb(230, 188, 112);
+            status.ForeColor = backend.Recommended ? ZeusTheme.Success : ZeusTheme.Warning;
             AddMuted(card, backend.Purpose, 16, 72, 250, 42);
             AddMuted(card, "Examples: " + backend.Examples, 16, 120, 250, 34);
             Button config = SmallButton(card, backend.Recommended ? "Use" : "Configure", 198, 132, 82);
@@ -445,7 +514,7 @@ internal sealed class ZeusForm : Form
 
     private Panel Page(string title, string subtitle)
     {
-        Panel page = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(20, 24, 29) };
+        Panel page = new() { Dock = DockStyle.Fill, BackColor = ZeusTheme.Surface };
         AddLabel(page, title, 24, 24, 520, 34, 19, true);
         AddMuted(page, subtitle, 26, 64, 800, 24);
         return page;
@@ -453,11 +522,12 @@ internal sealed class ZeusForm : Form
 
     private static Panel Card(int x, int y, int width, int height)
     {
-        return new Panel
+        return new ZeusCard
         {
             Location = new Point(x, y),
             Size = new Size(width, height),
-            BackColor = Color.FromArgb(29, 35, 42)
+            FillColor = ZeusTheme.SurfaceRaised,
+            StrokeColor = Color.FromArgb(62, 75, 88)
         };
     }
 
@@ -468,8 +538,8 @@ internal sealed class ZeusForm : Form
             Text = text,
             Location = new Point(x, y),
             Size = new Size(width, height),
-            ForeColor = Color.FromArgb(238, 242, 246),
-            Font = new Font("Segoe UI" + (semibold ? " Semibold" : ""), size)
+            ForeColor = ZeusTheme.Text,
+            Font = semibold ? ZeusTheme.LabelFont(size) : ZeusTheme.BodyFont(size)
         };
         parent.Controls.Add(label);
         return label;
@@ -478,22 +548,19 @@ internal sealed class ZeusForm : Form
     private static Label AddMuted(Control parent, string text, int x, int y, int width, int height)
     {
         Label label = AddLabel(parent, text, x, y, width, height);
-        label.ForeColor = Color.FromArgb(168, 180, 193);
+        label.ForeColor = ZeusTheme.TextMuted;
         return label;
     }
 
     private static Button HeaderButton(string text, int x, int y, int width)
     {
-        Button button = new()
+        Button button = new ZeusButton()
         {
             Text = text,
             Location = new Point(x, y),
             Size = new Size(width, 36),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(45, 54, 65),
-            ForeColor = Color.White
+            ForeColor = ZeusTheme.Text
         };
-        button.FlatAppearance.BorderColor = Color.FromArgb(82, 98, 115);
         return button;
     }
 
@@ -512,8 +579,8 @@ internal sealed class ZeusForm : Form
             DropDownStyle = ComboBoxStyle.DropDownList,
             Location = new Point(x, y),
             Size = new Size(width, 29),
-            BackColor = Color.FromArgb(38, 45, 53),
-            ForeColor = Color.White
+            BackColor = ZeusTheme.SurfaceInteractive,
+            ForeColor = ZeusTheme.Text
         };
         combo.Items.AddRange(values);
         combo.SelectedItem = values.Contains(selected) ? selected : values[0];
@@ -523,9 +590,7 @@ internal sealed class ZeusForm : Form
 
     private static void AddStep(Control parent, int number, string title, string body, int y)
     {
-        Label badge = AddLabel(parent, number.ToString(), 18, y, 26, 26, 10, true);
-        badge.TextAlign = ContentAlignment.MiddleCenter;
-        badge.BackColor = Color.FromArgb(59, 120, 168);
+        AddStatusChip(parent, number.ToString(), 18, y, 28, ZeusTheme.Action);
         AddLabel(parent, title, 58, y - 2, 260, 22, 10.5f, true);
         AddMuted(parent, body, 58, y + 22, 360, 24);
     }
@@ -540,22 +605,96 @@ internal sealed class ZeusForm : Form
     {
         AddLabel(parent, title, 18, y, 150, 22, 10, true);
         Label capLabel = AddMuted(parent, cap, 178, y, 130, 22);
-        capLabel.ForeColor = Color.FromArgb(130, 215, 176);
+        capLabel.ForeColor = ZeusTheme.Success;
         AddMuted(parent, body, 18, y + 24, 390, 28);
     }
 
     private static void AddLoadPill(Control parent, string title, string body, int x, int y)
     {
-        Panel pill = new()
+        Panel pill = new ZeusCard()
         {
             Location = new Point(x, y),
             Size = new Size(286, 36),
-            BackColor = Color.FromArgb(38, 45, 53)
+            FillColor = ZeusTheme.SurfaceInteractive,
+            StrokeColor = Color.FromArgb(70, 84, 98)
         };
         AddLabel(pill, title, 10, 7, 116, 22, 9, true);
         AddMuted(pill, body, 132, 7, 144, 22);
         parent.Controls.Add(pill);
     }
+
+    private void AddRailChip(string text, int x, int y, Color color)
+    {
+        ZeusChip chip = new()
+        {
+            Text = text,
+            Location = new Point(x, y),
+            Size = new Size(170, 30),
+            FillColor = color,
+            StrokeColor = color,
+            ForeColor = ZeusTheme.TextInverse
+        };
+        _nav.Controls.Add(chip);
+    }
+
+    private static ZeusChip AddStatusChip(Control parent, string text, int x, int y, int width, Color color)
+    {
+        ZeusChip chip = new()
+        {
+            Text = text,
+            Location = new Point(x, y),
+            Size = new Size(width, 28),
+            FillColor = color,
+            StrokeColor = color,
+            ForeColor = ZeusTheme.TextInverse
+        };
+        parent.Controls.Add(chip);
+        return chip;
+    }
+
+    private void AddModeRow(Control parent, string mode, string title, string body, int y)
+    {
+        bool active = string.Equals(_activeMode, mode, StringComparison.OrdinalIgnoreCase);
+        int rowWidth = Math.Max(260, parent.Width - 36);
+        int buttonX = rowWidth - 88;
+        Panel row = new ZeusCard
+        {
+            Location = new Point(18, y),
+            Size = new Size(rowWidth, 58),
+            FillColor = active ? Color.FromArgb(43, 75, 95) : ZeusTheme.SurfaceInteractive,
+            StrokeColor = active ? ZeusTheme.ActionHover : Color.FromArgb(70, 84, 98)
+        };
+        AddLabel(row, title, 14, 8, buttonX - 28, 22, 10.2f, true);
+        AddMuted(row, body, 14, 31, buttonX - 28, 20);
+        Button button = SmallButton(row, active ? "Active" : "Start", buttonX, 13, 74);
+        if (button is ZeusButton zeusButton)
+            zeusButton.Active = active;
+        button.Click += (_, _) =>
+        {
+            _activeMode = mode;
+            _status.Text = $"{mode} mode selected.";
+            Navigate("Home");
+        };
+        parent.Controls.Add(row);
+    }
+
+    private static void AddMiniStep(Control parent, string number, string title, string body, int x)
+    {
+        AddStatusChip(parent, number, x, 24, 30, ZeusTheme.Action);
+        AddLabel(parent, title, x + 42, 20, 90, 22, 10.5f, true);
+        AddMuted(parent, body, x + 42, 44, 96, 20);
+    }
+
+    private static Color DeviceAccent(string kind) => kind switch
+    {
+        "Room light" => ZeusTheme.Amber,
+        "Keyboard" => ZeusTheme.Blue,
+        "Mouse" => ZeusTheme.Purple,
+        "Dock" => ZeusTheme.Success,
+        "Laptop" => ZeusTheme.Fire,
+        "Strip" => ZeusTheme.Teal,
+        _ => ZeusTheme.TextMuted
+    };
 
     private void AddDevice(string name, string kind, string backend, string zone, float x, float y)
     {

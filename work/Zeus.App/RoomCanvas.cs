@@ -12,7 +12,7 @@ internal sealed class RoomCanvas : Control
     public RoomCanvas()
     {
         DoubleBuffered = true;
-        BackColor = Color.FromArgb(21, 25, 29);
+        BackColor = ZeusTheme.SurfaceRaised;
         Cursor = Cursors.Hand;
     }
 
@@ -49,32 +49,34 @@ internal sealed class RoomCanvas : Control
         Graphics g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         Rectangle room = RoomBounds();
-        using SolidBrush roomBrush = new(Color.FromArgb(29, 34, 39));
-        using Pen border = new(Color.FromArgb(76, 88, 99), 2);
-        g.FillRectangle(roomBrush, room);
-        g.DrawRectangle(border, room);
+        FillRound(g, room, Color.FromArgb(22, 27, 32), 12);
+        DrawRound(g, room, Color.FromArgb(75, 91, 106), 12, 2);
 
-        Rectangle monitor = new(room.Left + room.Width / 4, room.Top + 48, room.Width / 2, room.Height / 4);
-        Rectangle desk = new(room.Left + room.Width / 5, monitor.Bottom + 34, room.Width * 3 / 5, 64);
-        Rectangle rear = new(room.Left + 14, room.Bottom - 104, room.Width - 28, 88);
-        Rectangle left = new(room.Left + 14, room.Top + 18, 82, room.Height - 36);
-        Rectangle right = new(room.Right - 96, room.Top + 18, 82, room.Height - 36);
+        Rectangle ceiling = new(room.Left + 104, room.Top + 16, room.Width - 208, 34);
+        Rectangle monitor = new(room.Left + room.Width / 4, room.Top + 64, room.Width / 2, Math.Max(78, room.Height / 4));
+        Rectangle desk = new(room.Left + room.Width / 5, monitor.Bottom + 28, room.Width * 3 / 5, 58);
+        Rectangle rear = new(room.Left + 16, room.Bottom - 86, room.Width - 32, 70);
+        Rectangle left = new(room.Left + 16, room.Top + 24, 76, room.Height - 126);
+        Rectangle right = new(room.Right - 92, room.Top + 24, 76, room.Height - 126);
 
-        FillRound(g, left, Color.FromArgb(34, 45, 50), 10);
-        FillRound(g, right, Color.FromArgb(43, 39, 53), 10);
-        FillRound(g, rear, Color.FromArgb(39, 45, 49), 10);
-        FillRound(g, desk, Color.FromArgb(67, 52, 40), 10);
-        FillRound(g, monitor, Color.FromArgb(52, 62, 72), 8);
+        FillRound(g, ceiling, Color.FromArgb(40, 48, 53), 8);
+        FillRound(g, left, Color.FromArgb(34, 48, 50), 10);
+        FillRound(g, right, Color.FromArgb(45, 39, 55), 10);
+        FillRound(g, rear, Color.FromArgb(39, 48, 50), 10);
+        FillRound(g, desk, Color.FromArgb(68, 54, 41), 10);
+        FillRound(g, monitor, Color.FromArgb(49, 60, 70), 8);
+        DrawRound(g, monitor, ZeusTheme.Blue, 8, 1.2f);
 
         using Font labelFont = new("Segoe UI Semibold", 8.5f);
-        using SolidBrush labelBrush = new(Color.FromArgb(192, 202, 214));
+        using SolidBrush labelBrush = new(ZeusTheme.TextMuted);
+        g.DrawString("Ceiling", labelFont, labelBrush, ceiling.Left + 14, ceiling.Top + 9);
         g.DrawString("Main monitor", labelFont, labelBrush, monitor.Left + 14, monitor.Top + 12);
         g.DrawString("Desk", labelFont, labelBrush, desk.Left + 14, desk.Top + 12);
-        g.DrawString("Rear wall / room lights", labelFont, labelBrush, rear.Left + 14, rear.Top + 12);
+        g.DrawString("Rear wall", labelFont, labelBrush, rear.Left + 14, rear.Top + 12);
         g.DrawString("Left", labelFont, labelBrush, left.Left + 12, left.Top + 12);
         g.DrawString("Right", labelFont, labelBrush, right.Left + 10, right.Top + 12);
 
-        using Pen zonePen = new(Color.FromArgb(82, 98, 110), 1) { DashStyle = DashStyle.Dash };
+        using Pen zonePen = new(Color.FromArgb(92, 111, 125), 1) { DashStyle = DashStyle.Dash };
         g.DrawLine(zonePen, monitor.Left, monitor.Top - 18, monitor.Right, monitor.Top - 18);
         g.DrawLine(zonePen, monitor.Left, monitor.Bottom + 18, monitor.Right, monitor.Bottom + 18);
 
@@ -124,14 +126,30 @@ internal sealed class RoomCanvas : Control
         g.FillEllipse(brush, point.X - radius, point.Y - radius, radius * 2, radius * 2);
         g.DrawEllipse(ring, point.X - radius, point.Y - radius, radius * 2, radius * 2);
 
+        string initials = DeviceInitials(device.Name);
+        using Font initialsFont = new("Segoe UI Semibold", 6.5f);
+        TextRenderer.DrawText(
+            g,
+            initials,
+            initialsFont,
+            new Rectangle(point.X - radius, point.Y - radius, radius * 2, radius * 2),
+            ZeusTheme.TextInverse,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+
+        if (!selected)
+            return;
+
         string label = device.Name.Length > 20 ? device.Name[..20] + "..." : device.Name;
         using Font font = new("Segoe UI", 8.3f);
-        using SolidBrush text = new(device.Enabled ? Color.FromArgb(232, 237, 242) : Color.FromArgb(145, 153, 162));
-        using SolidBrush bg = new(Color.FromArgb(140, 18, 21, 25));
+        using SolidBrush text = new(device.Enabled ? ZeusTheme.Text : Color.FromArgb(145, 153, 162));
         SizeF size = g.MeasureString(label, font);
-        RectangleF labelBox = new(point.X + 13, point.Y - 12, size.Width + 8, size.Height + 4);
-        g.FillRectangle(bg, labelBox);
-        g.DrawString(label, font, text, point.X + 17, point.Y - 10);
+        float labelX = point.X + 14;
+        if (labelX + size.Width + 14 > Width - 8)
+            labelX = point.X - size.Width - 22;
+        labelX = Math.Max(8, labelX);
+        RectangleF labelBox = new(labelX, point.Y - 13, size.Width + 12, size.Height + 6);
+        FillRound(g, Rectangle.Round(labelBox), Color.FromArgb(218, 18, 22, 27), 6);
+        g.DrawString(label, font, text, labelX + 6, point.Y - 10);
     }
 
     private Point ToPoint(ZeusDevice device)
@@ -168,14 +186,24 @@ internal sealed class RoomCanvas : Control
 
     private static Color DeviceColor(string kind) => kind switch
     {
-        "Room light" => Color.FromArgb(250, 198, 92),
-        "Keyboard" => Color.FromArgb(102, 183, 255),
-        "Mouse" => Color.FromArgb(202, 126, 230),
-        "Dock" => Color.FromArgb(108, 218, 173),
-        "Laptop" => Color.FromArgb(242, 132, 118),
-        "Strip" => Color.FromArgb(120, 224, 210),
-        _ => Color.FromArgb(178, 188, 198)
+        "Room light" => ZeusTheme.Amber,
+        "Keyboard" => ZeusTheme.Blue,
+        "Mouse" => ZeusTheme.Purple,
+        "Dock" => ZeusTheme.Success,
+        "Laptop" => ZeusTheme.Fire,
+        "Strip" => ZeusTheme.Teal,
+        _ => ZeusTheme.TextMuted
     };
+
+    private static string DeviceInitials(string name)
+    {
+        string[] parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+            return "?";
+        if (parts.Length == 1)
+            return parts[0].Length <= 2 ? parts[0].ToUpperInvariant() : parts[0][..2].ToUpperInvariant();
+        return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
+    }
 
     private static void FillRound(Graphics g, Rectangle rect, Color color, int radius)
     {
@@ -188,5 +216,18 @@ internal sealed class RoomCanvas : Control
         path.CloseFigure();
         using SolidBrush brush = new(color);
         g.FillPath(brush, path);
+    }
+
+    private static void DrawRound(Graphics g, Rectangle rect, Color color, int radius, float width)
+    {
+        using GraphicsPath path = new();
+        int diameter = radius * 2;
+        path.AddArc(rect.Left, rect.Top, diameter, diameter, 180, 90);
+        path.AddArc(rect.Right - diameter, rect.Top, diameter, diameter, 270, 90);
+        path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
+        path.AddArc(rect.Left, rect.Bottom - diameter, diameter, diameter, 90, 90);
+        path.CloseFigure();
+        using Pen pen = new(color, width);
+        g.DrawPath(pen, path);
     }
 }
