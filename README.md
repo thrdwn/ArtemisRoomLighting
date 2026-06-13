@@ -4,6 +4,8 @@ A guided setup layer for Artemis RGB. It helps people discover existing Artemis 
 
 The assistant uses the official Artemis Workshop ecosystem instead of maintaining another copy of every hardware driver. Razer, Corsair, Logitech, SteelSeries, ASUS, Hue, Nanoleaf, WLED, Windows Dynamic Lighting, OpenRGB, and future providers all use the same mapping flow once Artemis detects their devices.
 
+The repo also contains an early **Zeus** prototype, a cleaner future direction where Artemis, OpenRGB, WiZ, WLED, Razer, and game integrations become backends behind a room-first UI. Its visual system is captured in [`DESIGN.md`](DESIGN.md) and linted with Google's [`@google/design.md`](https://github.com/google-labs-code/design.md) CLI.
+
 ## What it solves
 
 - Walk through a simple Activity -> Devices -> Support -> Room -> Review wizard
@@ -71,6 +73,13 @@ powershell -ExecutionPolicy Bypass -File .\work\RoomLighting.Installer\Build-Ins
 ```
 
 The installer is written to `outputs\ArtemisRoomLightingSetup-0.13.1.0.exe`.
+
+Design lint:
+
+```powershell
+npm ci --ignore-scripts
+npm run design:lint
+```
 
 ## License
 

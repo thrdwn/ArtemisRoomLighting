@@ -10,9 +10,20 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          cache: "npm"
+      - name: Lint DESIGN.md
+        run: |
+          npm ci --ignore-scripts
+          npm run design:lint
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
+      - name: Build Zeus prototype
+        shell: powershell
+        run: dotnet build .\work\Zeus.App\Zeus.App.csproj -c Release
       - name: Build installer
         shell: powershell
         run: .\work\RoomLighting.Installer\Build-Installer.ps1

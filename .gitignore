@@ -15,3 +15,4 @@ outputs/ZeusPrototype/
 *.log
 .vs/
 .idea/
+node_modules/
